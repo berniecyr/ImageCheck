@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>AI Security Monitor</title>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+
+<link rel="stylesheet"
+href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<style>
+
+:root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --blue: #2563eb;
+    --green: #10b981;
+    --red: #ef4444;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Segoe UI, sans-serif;
+    padding: 20px;
+}
+
+.header {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 20px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 12px var(--green);
+}
+
+.nav-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.nav-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-weight: 600;
+    color: white;
+    background: var(--blue);
+}
+
+.nav-btn:hover {
+    opacity: 0.92;
+}
+
+.delete-btn {
+    background: var(--red);
+}
+
+.settings-btn {
+    background: #475569;
+}
+
+.filters {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 15px;
+    margin-bottom: 20px;
+
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filters input,
+.filters select,
+.modal input,
+.modal select,
+#events-container input,
+#events-container select {
+    background: #334155 !important; /* A medium-grey color */
+    border: 1px solid #475569;     /* A slightly lighter border */
+    color: white;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+#tableContainer,
+#cardContainer {
+
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+}
+
+#cardContainer {
+    display: none;
+}
+
+.cards-grid {
+
+    display: grid;
+    grid-template-columns: repeat(auto-fill,minmax(300px,1fr));
+    gap: 15px;
+}
+
+.card {
+
+    background: #111827;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.card-images {
+
+    display: grid;
+    grid-template-columns: 1fr 5fr;
+    gap: 2px;
+    background: black;
+}
+
+/* Base styles for all images in the grid */
+.card-images img {
+    width: 100%;
+    object-fit: contain;
+    background: black;
+    cursor: pointer;
+}
+
+/* Top Left: The Face Image */
+.card-images > img:nth-child(1) {
+    width: 100%;         /* Or whatever width you need, e.g., 80px */
+    aspect-ratio: 1 / 1; /* Forces a perfect square */
+    object-fit: cover;   /* Prevents squishing */
+    object-position: top left;
+}
+
+/* Right Side: The Explicit Landscape Image */
+.card-images > img:nth-child(2) {
+    width: 100%;          /* Fills the remaining column width */
+    aspect-ratio: 16 / 9; /* Forces a standard landscape shape (adjust as needed) */
+    object-fit: cover;    /* Ensures real images fill the box perfectly without stretching */
+    object-position: top center;
+}
+
+.card-content {
+    padding: 14px;
+}
+
+.card-row {
+    margin-bottom: 12px;
+}
+
+.label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.value {
+    font-size: 0.94rem;
+    word-break: break-word;
+}
+
+.thumb {
+
+    width: 140px;
+    height: 90px;
+    object-fit: contain;
+    background: black;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.modal {
+
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 5000;
+
+    justify-content: center;
+    align-items: center;
+}
+
+.modal img {
+
+    max-width: 96%;
+    max-height: 96%;
+}
+
+.close-modal {
+
+    position: absolute;
+    top: 20px;
+    right: 20px;
+
+    width: 42px;
+    height: 42px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: var(--red);
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.dataTables_wrapper {
+    color: white;
+}
+
+table.dataTable tbody tr {
+    background: var(--card);
+}
+
+table.dataTable tbody td {
+    color: white;
+    vertical-align: middle;
+}
+
+@media(max-width:900px){
+
+    .card-images {
+        grid-template-columns: 1fr;
+    }
+
+    .thumb {
+        width: 100px;
+        height: 70px;
+    }
+}
+
+/* ── Stats Bar ─────────────────────────────────────── */
+.stats-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 22px;
+    flex: 1;
+    min-width: 110px;
+    text-align: center;
+    transition: border-color .2s;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+    color: var(--text);
+}
+
+.stat-label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.stat-card.s-red   { border-color: var(--red);   }
+.stat-card.s-red   .stat-value { color: var(--red);   }
+.stat-card.s-green { border-color: var(--green); }
+.stat-card.s-green .stat-value { color: var(--green); }
+.stat-card.s-blue  { border-color: var(--blue);  }
+.stat-card.s-blue  .stat-value { color: var(--blue);  }
+
+/* ── Auto-refresh pulse on status dot ─────────────── */
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 12px var(--green); }
+    50%       { box-shadow: 0 0 22px var(--green), 0 0 6px #fff2; }
+}
+.status-dot.live { animation: pulse 1.4s ease-in-out infinite; }
+
+/* ── Config Editor Modal ───────────────────────────── */
+.config-tabs {
+    display: flex;
+    gap: 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+}
+
+.config-tab-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 18px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.88rem;
+    transition: all .15s;
+}
+
+.config-tab-btn.active {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: white;
+}
+
+.config-tab-btn:hover:not(.active) {
+    border-color: var(--blue);
+    color: var(--text);
+}
+
+.config-textarea {
+    width: 100%;
+    height: 420px;
+    background: #0a0f1e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: #94a3b8;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    padding: 14px;
+    resize: vertical;
+    box-sizing: border-box;
+    tab-size: 4;
+}
+
+.config-textarea:focus {
+    outline: none;
+    border-color: var(--blue);
+    color: var(--text);
+}
+
+.cfg-notice {
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.83rem;
+    margin-bottom: 16px;
+}
+
+.cfg-notice.warn {
+    background: #271e00;
+    border: 1px solid #f59e0b;
+    color: #f59e0b;
+}
+
+.cfg-notice.info {
+    background: #0f1e30;
+    border: 1px solid var(--blue);
+    color: #60a5fa;
+}
+
+.cred-section {
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.cred-section:last-child { border-bottom: none; margin-bottom: 0; }
+
+.cred-section h4 {
+    margin: 0 0 12px 0;
+    color: var(--blue);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.cred-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.cred-field {
+    flex: 1;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.cred-field label {
+    font-size: 0.73rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.cred-field input {
+    background: #0a0f1e !important;
+    border: 1px solid var(--border) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 9px 11px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 0.88rem;
+}
+
+.cred-field input:focus {
+    outline: none !important;
+    border-color: var(--blue) !important;
+}
+
+.set-badge {
+    display: inline-block;
+    background: #1a3a1a;
+    color: var(--green);
+    border: 1px solid var(--green);
+    border-radius: 4px;
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    margin-left: 5px;
+    vertical-align: middle;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.save-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.save-msg { font-size: 0.85rem; color: var(--green); }
+.save-msg.err { color: var(--red); }
+
+</style>
+</head>
+
+<body>
+
+<div class="header">
+
+    <div class="header-left">
+        <div class="status-dot" id="statusDot"></div>
+        <h2>AI Security Monitor</h2>
+    </div>
+
+    <div class="nav-controls">
+
+        <button class="nav-btn"
+        onclick="toggleView()">
+            Toggle View
+        </button>
+
+        <button class="nav-btn settings-btn"
+        onclick="openEventModal()">
+            🔔 Event Manager
+        </button>
+
+        <button class="nav-btn settings-btn"
+        onclick="openSecurityModal()">
+            🔒 Security Config
+        </button>
+
+        <button class="nav-btn delete-btn"
+        onclick="deleteSelected()">
+            Delete Selected
+        </button>
+
+        <button class="nav-btn settings-btn"
+        onclick="openConfigModal()">
+            ⚙ Config
+        </button>
+
+        <a href="/logout"
+        class="nav-btn"
+        style="text-decoration:none;display:flex;align-items:center;">
+            Logout
+        </a>
+
+    </div>
+</div>
+
+<!-- ── Stats Bar ───────────────────────────────────── -->
+<div class="stats-bar">
+    <div class="stat-card">
+        <div class="stat-value" id="statTotal">—</div>
+        <div class="stat-label">Total Records</div>
+    </div>
+    <div class="stat-card s-red">
+        <div class="stat-value" id="statExplicit">—</div>
+        <div class="stat-label">Explicit Events</div>
+    </div>
+    <div class="stat-card s-green">
+        <div class="stat-value" id="statFaces">—</div>
+        <div class="stat-label">Face Detections</div>
+    </div>
+    <div class="stat-card s-blue">
+        <div class="stat-value" id="statShowing">—</div>
+        <div class="stat-label">Showing</div>
+    </div>
+</div>
+
+<!-- ── Filters ────────────────────────────────────── -->
+<div class="filters">
+
+    <input type="text"
+    id="searchInput"
+    placeholder="🔍 Search all fields...">
+
+    <!-- PRIMARY FIX: default is "Any Explicit" so blank records are hidden by default -->
+    <select id="explicitFilter">
+        <option value="has_explicit">✓ Any Explicit</option>
+        <option value="all_records">All Records</option>
+        <option value="no_explicit">✗ Non-Explicit Only</option>
+        <!-- categories are appended dynamically from data -->
+    </select>
+
+    <select id="personFilter">
+        <option value="all">All People</option>
+    </select>
+
+    <select id="genderFilter">
+        <option value="all">All Genders</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+    </select>
+
+    <select id="cameraFilter">
+        <option value="all">All Cameras</option>
+    </select>
+
+    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;">
+        <input type="checkbox" id="showBlankRecords">
+        Show blank
+    </label>
+
+    <button class="nav-btn settings-btn"
+    onclick="resetFilters()"
+    style="white-space:nowrap;">
+        ↺ Reset
+    </button>
+
+    <button class="nav-btn settings-btn"
+    onclick="exportCSV()"
+    style="white-space:nowrap;">
+        ⬇ CSV
+    </button>
+
+    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;margin-left:auto;white-space:nowrap;">
+        <input type="checkbox" id="autoRefresh">
+        Auto-refresh
+    </label>
+
+    <span id="recordCount"
+    style="color:var(--muted);font-size:0.85rem;white-space:nowrap;"></span>
+
+</div>
+
+<div id="tableContainer">
+
+    <table id="logsTable"
+    class="display"
+    style="width:100%">
+
+        <thead>
+
+        <tr>
+
+            <th>
+                <input type="checkbox" id="selectAll">
+            </th>
+
+            <th>ID</th>
+            <th>From</th>
+            <th>Source</th>
+            <th>Person</th>
+            <th>Gender</th>
+            <th>Explicit Parts</th>
+            <th>Confidence</th>
+            <th>Face</th>
+            <th>Nudity</th>
+            <th>Actions</th>
+
+        </tr>
+
+        </thead>
+
+    </table>
+
+</div>
+
+<div id="cardContainer">
+
+    <div class="cards-grid"
+    id="cardsGrid"></div>
+
+</div>
+
+<div class="modal"
+id="imageModal">
+
+    <button class="close-modal"
+    onclick="closeModal()">
+        ×
+    </button>
+
+    <img id="modalImg">
+
+</div>
+
+<div class="modal" id="eventModal" onclick="closeEventModal(event)">
+    <div style="background: var(--card); width: 90%; max-width: 800px; padding: 25px; border-radius: 14px; border: 1px solid var(--border); max-height: 85vh; overflow-y: auto; position: relative;" onclick="event.stopPropagation()">
+        
+        <button class="close-btn" style="position: absolute; top: 15px; right: 15px; width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--red); color: white; font-size: 20px; cursor: pointer;" onclick="closeEventModal({target: this})">×</button>
+        <h2 style="margin-top: 0; margin-bottom: 20px;">🔔 Event Manager Configuration</h2>
+        
+        <div id="events-container"></div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="nav-btn" style="background: var(--green);" onclick="addNewEvent()">+ Add New Event</button>
+            <button class="nav-btn" style="background: var(--blue); margin-left: auto;" onclick="saveEvents()">Save Configuration</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="securityModal" onclick="closeSecurityModal(event)">
+    <div style="background: var(--card); width: 90%; max-width: 500px; padding: 25px; border-radius: 14px; border: 1px solid var(--border); position: relative;" onclick="event.stopPropagation()">
+        
+        <button class="close-btn" style="position: absolute; top: 15px; right: 15px; width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--red); color: white; font-size: 20px; cursor: pointer;" onclick="closeSecurityModal({target: this})">×</button>
+        <h2 style="margin-top: 0; margin-bottom: 20px;">🔒 Security Configuration</h2>
+        
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin-bottom: 10px; color: var(--blue);">Dashboard Login</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="secDashUser" placeholder="Dashboard Username" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
+                <input type="password" id="secDashPass" placeholder="Dashboard Password" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin-bottom: 10px; color: var(--green);">Camera RTSP Credentials</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="secCamUser" placeholder="Camera Username" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
+                <input type="password" id="secCamPass" placeholder="Camera Password" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
+            </div>
+            <input type="text" id="secCamIP" placeholder="Camera IP Address (e.g., 192.168.1.100)" style="width: 100%; box-sizing: border-box; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
+        </div>
+        
+        <div style="display: flex; margin-top: 20px;">
+            <button class="nav-btn" style="background: var(--blue); width: 100%;" onclick="saveSecurityConfig()">Save & Restart System</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Config Editor Modal ─────────────────────────── -->
+<div class="modal" id="configModal" onclick="closeConfigModal(event)">
+<div style="background:var(--card);width:90%;max-width:740px;padding:25px;border-radius:14px;border:1px solid var(--border);max-height:92vh;overflow-y:auto;position:relative;" onclick="event.stopPropagation()">
+
+    <button class="close-btn" style="position:absolute;top:15px;right:15px;width:35px;height:35px;border-radius:50%;border:none;background:var(--red);color:white;font-size:20px;cursor:pointer;" onclick="closeConfigModal({target:this})">×</button>
+
+    <h2 style="margin:0 0 20px 0;">⚙ Configuration Editor</h2>
+
+    <!-- Tabs -->
+    <div class="config-tabs">
+        <button class="config-tab-btn active" id="tab-btn-ini"   onclick="switchConfigTab('ini')">📄 config.ini</button>
+        <button class="config-tab-btn"         id="tab-btn-creds" onclick="switchConfigTab('creds')">🔒 Credentials</button>
+    </div>
+
+    <!-- ── config.ini tab ───────────────────────────── -->
+    <div id="config-tab-ini">
+        <div class="cfg-notice warn">
+            ⚠ Editing the raw file. Changes take effect after restarting the application. Comments and formatting are preserved exactly as written.
+        </div>
+        <textarea id="configIniContent" class="config-textarea" spellcheck="false"></textarea>
+        <div class="save-row">
+            <button class="nav-btn" style="background:var(--blue);" onclick="saveConfigFile()">💾 Save config.ini</button>
+            <button class="nav-btn settings-btn" onclick="loadConfigFile()" style="padding:10px 14px;">↺ Reload</button>
+            <span id="iniSaveMsg" class="save-msg"></span>
+        </div>
+    </div>
+
+    <!-- ── Credentials (login.env) tab ──────────────── -->
+    <div id="config-tab-creds" style="display:none;">
+        <div class="cfg-notice warn">
+            ⚠ Passwords and tokens are write-only — existing values are never shown. Leave a field blank to keep its current value.
+        </div>
+        <div class="cfg-notice info" style="margin-bottom:20px;">
+            ℹ Sensitive fields (passwords, tokens) are stored in <code>login.env</code> and are gitignored. Non-sensitive fields (usernames, IPs) reflect the current stored value.
+        </div>
+
+        <!-- Dashboard Login -->
+        <div class="cred-section">
+            <h4>Dashboard Login</h4>
+            <div class="cred-row">
+                <div class="cred-field">
+                    <label>Username</label>
+                    <input type="text" id="cred_dash_user" placeholder="admin">
+                </div>
+                <div class="cred-field">
+                    <label>Password <span id="badge_dash_pass"></span></label>
+                    <input type="password" id="cred_dash_pass" placeholder="Leave blank to keep current">
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera RTSP -->
+        <div class="cred-section">
+            <h4>Camera RTSP</h4>
+            <div class="cred-row">
+                <div class="cred-field">
+                    <label>IP Address</label>
+                    <input type="text" id="cred_cam_ip" placeholder="192.168.x.x">
+                </div>
+                <div class="cred-field">
+                    <label>Username</label>
+                    <input type="text" id="cred_cam_user" placeholder="admin">
+                </div>
+                <div class="cred-field">
+                    <label>Password <span id="badge_cam_pass"></span></label>
+                    <input type="password" id="cred_cam_pass" placeholder="Leave blank to keep current">
+                </div>
+            </div>
+        </div>
+
+        <!-- Sighthound -->
+        <div class="cred-section">
+            <h4>Sighthound Email</h4>
+            <div class="cred-row">
+                <div class="cred-field" style="max-width:380px;">
+                    <label>Google App Password <span id="badge_sighthound"></span></label>
+                    <input type="password" id="cred_sighthound_pass" placeholder="Leave blank to keep current">
+                </div>
+            </div>
+        </div>
+
+        <!-- Cube Automation -->
+        <div class="cred-section">
+            <h4>Cube Automation</h4>
+            <div class="cred-row">
+                <div class="cred-field" style="max-width:380px;">
+                    <label>API Token <span id="badge_cube"></span></label>
+                    <input type="password" id="cred_cube_token" placeholder="Leave blank to keep current">
+                </div>
+            </div>
+        </div>
+
+        <div class="save-row">
+            <button class="nav-btn" style="background:var(--blue);" onclick="saveCredentials()">💾 Save Credentials</button>
+            <span id="credSaveMsg" class="save-msg"></span>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script>
+
+let allLogs = [];
+let table   = null;
+let cardMode = false;
+let currentEventsConfig = { settings: {}, events: [] };
+let _refreshTimer = null;
+
+function mediaUrl(path) {
+
+    return `/serve_media?path=${encodeURIComponent(path)}`;
+}
+
+function openImage(url) {
+
+    document.getElementById('imageModal').style.display = 'flex';
+
+    document.getElementById('modalImg').src = url;
+}
+
+function closeModal() {
+
+    document.getElementById('imageModal').style.display = 'none';
+}
+
+function getCurrentSortedRows() {
+
+    if (!table)
+        return allLogs;
+
+    return table
+        .rows({ search: 'applied', order: 'applied' })
+        .data()
+        .toArray();
+}
+
+function toggleView() {
+
+    cardMode = !cardMode;
+
+    document.getElementById('tableContainer').style.display =
+        cardMode ? 'none' : 'block';
+
+    document.getElementById('cardContainer').style.display =
+        cardMode ? 'block' : 'none';
+
+    if (cardMode) {
+        buildCards(getCurrentSortedRows());
+    }
+}
+
+async function loadLogs() {
+    const response = await fetch('/api/all_logs');
+    const json     = await response.json();
+
+    allLogs = json.data || [];
+
+    // Deduplicate explicit_parts entries that get stored twice
+    allLogs.forEach(log => {
+        if (log.explicit_parts) {
+            const parts = log.explicit_parts.split(',').map(p => p.trim()).filter(Boolean);
+            log.explicit_parts = [...new Set(parts)].join(', ');
+        }
+    });
+
+    updateStatsBar(allLogs);   // populate stats cards
+    populateFilters();          // rebuild all dropdowns
+    buildTable();               // init DataTables
+    applyFilters();             // apply the default "has_explicit" filter immediately
+}
+
+function populateFilters() {
+
+    const people     = new Set();
+    const cameras    = new Set();
+    const categories = new Set();
+
+    allLogs.forEach(log => {
+
+        // People
+        if (log.person_name) {
+            log.person_name.split(',').forEach(n => {
+                const clean = n.trim();
+                if (clean && !['unknown','testing'].includes(clean.toLowerCase()))
+                    people.add(clean);
+            });
+        }
+
+        // Cameras (fromwhere)
+        if (log.fromwhere && log.fromwhere.trim())
+            cameras.add(log.fromwhere.trim());
+
+        // Explicit categories — derived from real data, not a hardcoded list
+        if (log.explicit_parts) {
+            log.explicit_parts.split(',').forEach(p => {
+                const clean = p.trim().toUpperCase();
+                if (clean && clean !== 'NONE') categories.add(clean);
+            });
+        }
+    });
+
+    // ── Person filter ─────────────────────────────────
+    const personFilter  = document.getElementById('personFilter');
+    const savedPerson   = personFilter.value;
+    personFilter.innerHTML = '<option value="all">All People</option>';
+    [...people].sort().forEach(p => {
+        personFilter.innerHTML += `<option value="${p}">${p}</option>`;
+    });
+    if ([...people].includes(savedPerson)) personFilter.value = savedPerson;
+
+    // ── Explicit filter ───────────────────────────────
+    // Static anchor options come first; data-driven categories appended below.
+    const explicitFilter = document.getElementById('explicitFilter');
+    const savedExplicit  = explicitFilter.value || 'has_explicit';
+    explicitFilter.innerHTML = `
+        <option value="has_explicit">✓ Any Explicit</option>
+        <option value="all_records">All Records</option>
+        <option value="no_explicit">✗ Non-Explicit Only</option>
+    `;
+    if (categories.size > 0) {
+        explicitFilter.innerHTML += `<option disabled>── By Category ──</option>`;
+        [...categories].sort().forEach(cat => {
+            explicitFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+    }
+    // Restore previous selection if it still exists
+    const validValues = [...explicitFilter.options].map(o => o.value);
+    explicitFilter.value = validValues.includes(savedExplicit) ? savedExplicit : 'has_explicit';
+
+    // ── Camera filter ─────────────────────────────────
+    const cameraFilter = document.getElementById('cameraFilter');
+    const savedCamera  = cameraFilter.value;
+    cameraFilter.innerHTML = '<option value="all">All Cameras</option>';
+    [...cameras].sort().forEach(cam => {
+        cameraFilter.innerHTML += `<option value="${cam}">${cam}</option>`;
+    });
+    if ([...cameras].includes(savedCamera)) cameraFilter.value = savedCamera;
+}
+
+function buildTable() {
+
+    if ($.fn.DataTable.isDataTable('#logsTable')) {
+
+        $('#logsTable').DataTable().destroy();
+    }
+
+    table = $('#logsTable').DataTable({
+
+        data: allLogs,
+
+        pageLength: 100,
+
+        order: [[1,'desc']],
+
+        columns: [
+
+            {
+                data: null,
+                orderable: false,
+
+                render: function(data) {
+
+                    return `
+                        <input
+                            type="checkbox"
+                            class="record-checkbox"
+                            value="${data.id}">
+                    `;
+                }
+            },
+
+            {
+                data: 'id',
+                // 2. Enforce numerical sorting so 990 correctly follows 989
+                type: 'num'
+            },
+
+            {
+                data: 'fromwhere',
+                defaultContent: ''
+            },
+
+            {
+                data: 'source_file',
+
+                render: function(data) {
+
+                    if (!data)
+                        return '';
+
+                    return data.split(/[\\/]/).pop();
+                }
+            },
+
+            {
+                data: 'person_name',
+                defaultContent: 'Unknown'
+            },
+
+            {
+                data: 'gender',
+                defaultContent: '—'
+            },
+
+            {
+                data: 'explicit_parts',
+                defaultContent: 'None'
+            },
+
+            {
+                data: 'confidence',
+
+                render: function(data) {
+
+                    return data
+                        ? parseFloat(data).toFixed(2) + '%'
+                        : '0%';
+                }
+            },
+
+            {
+                data: 'faces_path',
+                orderable: false,
+
+                render: function(data) {
+
+                    if (!data)
+                        return '—';
+
+                    const url = mediaUrl(data);
+
+                    return `
+                        <img
+                            class="thumb"
+                            src="${url}"
+                            onclick="openImage('${url}')">
+                    `;
+                }
+            },
+
+            {
+                data: null,
+                orderable: false,
+
+                render: function(row) {
+
+                    let preview = null;
+
+                    // PRIORITIZE NUDITY PATH FIRST
+                    // Flask will auto-heal stale paths now
+
+                    if (row.nudity_path) {
+
+                        preview = mediaUrl(row.nudity_path);
+                    }
+                    else if (row.source_file) {
+
+                        preview = mediaUrl(row.source_file);
+                    }
+
+                    if (!preview)
+                        return '—';
+
+                    return `
+                        <img
+                            class="thumb"
+                            src="${preview}"
+                            onclick="openImage('${preview}')">
+                    `;
+                }
+            },
+
+            {
+                data: null,
+                orderable: false,
+
+                render: function(data) {
+
+                    return `
+                        <button
+                            class="nav-btn delete-btn"
+                            onclick="deleteLog(${data.id})">
+                            Delete
+                        </button>
+                    `;
+                }
+            }
+
+        ]
+    });
+}
+
+function buildCards(logs) {
+
+    const grid =
+        document.getElementById('cardsGrid');
+
+    grid.innerHTML = '';
+
+    logs.forEach(log => {
+
+        const faceImage = log.faces_path
+            ? mediaUrl(log.faces_path)
+            : '';
+
+        let nudityPreview = '';
+
+        // FIX: Prioritize nudity_path first, matching the list view logic
+        if (log.nudity_path) {
+
+            nudityPreview = mediaUrl(log.nudity_path);
+        }
+        else if (log.source_file) {
+
+            nudityPreview = mediaUrl(log.source_file);
+        }
+
+        // 1. Define a 1x1 transparent placeholder pixel
+        const emptyPixel = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+        // 2. Add an 'onerror' fallback to instantly replace broken 404 images
+        const face = faceImage
+            ? `<img src="${faceImage}" onclick="openImage('${faceImage}')" onerror="this.onerror=null; this.src='${emptyPixel}';">`
+            : `<img src="${emptyPixel}">`;
+
+        const nudity = nudityPreview
+            ? `<img src="${nudityPreview}" onclick="openImage('${nudityPreview}')" onerror="this.onerror=null; this.src='${emptyPixel}';">`
+            : `<img src="${emptyPixel}">`;
+
+        const card = document.createElement('div');
+
+        card.className = 'card';
+
+        // Set the primary saved path for display tracking
+        const savedLocation = log.nudity_path || log.faces_path || 'None';
+
+        card.innerHTML = `
+
+            <div class="card-images">
+                ${face}
+                ${nudity}
+            </div>
+
+            <div class="card-content" style="padding: 12px;">
+
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 0.85rem; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                    
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input type="checkbox" class="record-checkbox" value="${log.id}" style="margin: 0; cursor: pointer;">
+                        <span style="color: var(--muted);">ID:</span> <strong>${log.id || ''}</strong>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 110px;">
+                        <span style="color: var(--muted);">👤</span> <strong>${log.person_name || 'Unknown'}</strong>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="color: var(--muted);">Conf:</span> <strong style="color: var(--green);">${log.confidence || 0}%</strong>
+                    </div>
+
+                </div>
+
+                <div class="card-row" style="margin-bottom: 10px;">
+                    <div class="label" style="display: inline-block; margin-right: 6px;">Explicit Parts:</div>
+                    <div class="value" style="display: inline-block; font-size: 0.85rem;">${log.explicit_parts || 'None'}</div>
+                </div>
+
+                <div style="font-size: 0.7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;">
+                    <span class="label" style="display: inline; margin-right: 4px;">Source:</span>${log.source_file || ''}
+                </div>
+                
+                <div style="font-size: 0.7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 12px;">
+                    <span class="label" style="display: inline; margin-right: 4px;">Saved:</span>${savedLocation}
+                </div>
+
+                <div style="display:flex;gap:8px;margin-top:4px;">
+
+                    <button 
+                        class="nav-btn delete-btn" 
+                        style="flex:1;padding:8px;font-size:0.85rem;" 
+                        onclick="deleteLog(${log.id})">
+                        🗑 Delete
+                    </button>
+
+                    ${log.faces_path ? `
+                    <button 
+                        class="nav-btn"
+                        style="flex:1;padding:8px;font-size:0.85rem;background:var(--green);"
+                        onclick="promptAddToBaseline('${log.faces_path.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
+                        + Baseline
+                    </button>` : ''}
+
+                </div>
+
+            </div>
+        `;
+
+        grid.appendChild(card);
+    });
+    // Apply remembered selections to the newly drawn cards
+    syncCheckboxes();
+}
+
+async function deleteLog(id) {
+
+    if (!confirm('Delete this record?'))
+        return;
+
+    await fetch(`/delete_log/${id}`, {
+        method: 'POST'
+    });
+
+    loadLogs();
+}
+
+async function deleteSelected() {
+    // Pull the IDs from our memory Set instead of the DOM
+    const ids = Array.from(selectedRecordIds);
+
+    if (!ids.length) {
+        alert('No records selected.');
+        return;
+    }
+
+    if (!confirm(`Delete ${ids.length} records?`))
+        return;
+
+    await fetch('/delete_logs_bulk', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ids })
+    });
+
+    // Clear memory and reload after successful deletion
+    selectedRecordIds.clear();
+    $('#selectAll').prop('checked', false);
+    loadLogs();
+}
+
+function applyFilters() {
+
+    const text     = document.getElementById('searchInput').value.toLowerCase();
+    const person   = document.getElementById('personFilter').value;
+    const explicit = document.getElementById('explicitFilter').value;
+    const gender   = document.getElementById('genderFilter').value;
+    const camera   = document.getElementById('cameraFilter').value;
+    const showBlank = document.getElementById('showBlankRecords').checked;
+
+    const filtered = allLogs.filter(log => {
+
+        // ── Text search ──────────────────────────────
+        if (text && !JSON.stringify(log).toLowerCase().includes(text))
+            return false;
+
+        // ── Normalise values ─────────────────────────
+        const pName    = (log.person_name   || '').trim().toLowerCase();
+        const eParts   = (log.explicit_parts || '').trim().toLowerCase();
+        const hasPerson  = pName  !== '' && pName  !== 'testing' && pName !== 'unknown';
+        const hasExplicit = eParts !== '' && eParts !== 'none';
+
+        // ── Blank-records gate ───────────────────────
+        if (!showBlank && !hasPerson && !hasExplicit) return false;
+
+        // ── Explicit filter (THE CORE FIX) ───────────
+        // "has_explicit"  → only records that genuinely have explicit content
+        // "all_records"   → no filter at all
+        // "no_explicit"   → only records without explicit content
+        // anything else   → treat as a specific category name
+        if (explicit === 'has_explicit') {
+            if (!hasExplicit) return false;
+
+        } else if (explicit === 'no_explicit') {
+            if (hasExplicit) return false;
+
+        } else if (explicit !== 'all_records') {
+            // Specific category match
+            if (!hasExplicit) return false;
+            const partsArray = (log.explicit_parts || '')
+                .split(',').map(p => p.trim().toUpperCase());
+            if (!partsArray.includes(explicit.toUpperCase())) return false;
+        }
+
+        // ── Person filter ────────────────────────────
+        if (person !== 'all') {
+            if (!hasPerson) return false;
+            const personArray = (log.person_name || '')
+                .split(',').map(p => p.trim());
+            if (!personArray.includes(person)) return false;
+        }
+
+        // ── Gender filter ────────────────────────────
+        if (gender !== 'all') {
+            if ((log.gender || '').toLowerCase() !== gender.toLowerCase())
+                return false;
+        }
+
+        // ── Camera filter ────────────────────────────
+        if (camera !== 'all') {
+            if ((log.fromwhere || '').trim() !== camera) return false;
+        }
+
+        return true;
+    });
+
+    table.clear().rows.add(filtered).draw();
+    updateStatsBar(filtered);
+    if (cardMode) buildCards(filtered);
+
+    document.getElementById('recordCount').innerText =
+        `${filtered.length.toLocaleString()} / ${allLogs.length.toLocaleString()} records`;
+}
+
+// --- SELECTION MEMORY & SHIFT-CLICK LOGIC ---
+const selectedRecordIds = new Set();
+let lastChecked = null;
+
+// Helper function to push memory state to the visible UI
+function syncCheckboxes() {
+    $('.record-checkbox').each(function() {
+        const id = String($(this).val());
+        $(this).prop('checked', selectedRecordIds.has(id));
+    });
+}
+
+// 1. Handle Click and Shift-Click
+$(document).on('click', '.record-checkbox', function(e) {
+    // Scope the range calculation only to the view we are currently looking at
+    const $container = $(this).closest('#tableContainer, #cardContainer');
+    const $checkboxes = $container.find('.record-checkbox');
+
+    // Execute Shift-Click logic
+    if (e.shiftKey && lastChecked) {
+        const start = $checkboxes.index(this);
+        const end = $checkboxes.index(lastChecked);
+
+        if (start !== -1 && end !== -1) {
+            const targetState = lastChecked.checked;
+            $checkboxes.slice(Math.min(start, end), Math.max(start, end) + 1).each(function() {
+                $(this).prop('checked', targetState);
+            });
+        }
+    }
+    lastChecked = this;
+
+    // Save the active view's checkbox states into our memory Set
+    $checkboxes.each(function() {
+        const id = String($(this).val());
+        if ($(this).is(':checked')) {
+            selectedRecordIds.add(id);
+        } else {
+            selectedRecordIds.delete(id);
+        }
+    });
+
+    // Mirror the new memory state to the hidden view
+    syncCheckboxes();
+});
+
+// 2. Updated Select All (Memory Aware)
+$(document).on('change', '#selectAll', function() {
+    const isChecked = $(this).is(':checked');
+    const $visibleCheckboxes = $('.record-checkbox:visible');
+    
+    $visibleCheckboxes.each(function() {
+        const id = String($(this).val());
+        if (isChecked) {
+            selectedRecordIds.add(id);
+        } else {
+            selectedRecordIds.delete(id);
+        }
+    });
+
+    syncCheckboxes();
+    lastChecked = null; // Reset shift-click anchor
+});
+
+// 3. Re-apply selections automatically when DataTables changes pages
+$(document).on('draw.dt', '#logsTable', function() {
+    syncCheckboxes();
+});
+
+document.getElementById('searchInput')
+    .addEventListener('input', applyFilters);
+
+document.getElementById('personFilter')
+    .addEventListener('change', applyFilters);
+
+document.getElementById('explicitFilter')
+    .addEventListener('change', applyFilters);
+
+document.getElementById('genderFilter')
+    .addEventListener('change', applyFilters);
+
+document.getElementById('cameraFilter')
+    .addEventListener('change', applyFilters);
+
+document.getElementById('showBlankRecords')
+    .addEventListener('change', applyFilters);
+
+// ── Stats bar ────────────────────────────────────────────────────────
+function updateStatsBar(visibleLogs) {
+    const shown = (visibleLogs || allLogs).length;
+
+    const explicitTotal = allLogs.filter(l => {
+        const p = (l.explicit_parts || '').trim().toLowerCase();
+        return p && p !== 'none';
+    }).length;
+
+    const faceTotal = allLogs.filter(l =>
+        (l.faces_path || '').trim()
+    ).length;
+
+    document.getElementById('statTotal').textContent    = allLogs.length.toLocaleString();
+    document.getElementById('statExplicit').textContent = explicitTotal.toLocaleString();
+    document.getElementById('statFaces').textContent    = faceTotal.toLocaleString();
+    document.getElementById('statShowing').textContent  = shown.toLocaleString();
+}
+
+// ── Reset all filters to sensible defaults ───────────────────────────
+function resetFilters() {
+    document.getElementById('searchInput').value       = '';
+    document.getElementById('explicitFilter').value    = 'has_explicit';
+    document.getElementById('personFilter').value      = 'all';
+    document.getElementById('genderFilter').value      = 'all';
+    document.getElementById('cameraFilter').value      = 'all';
+    document.getElementById('showBlankRecords').checked = false;
+    applyFilters();
+}
+
+// ── Export visible rows to CSV ───────────────────────────────────────
+function exportCSV() {
+    const rows = table.rows({ search: 'applied', order: 'applied' }).data().toArray();
+
+    if (!rows.length) {
+        alert('No records to export (check your filters).');
+        return;
+    }
+
+    const escape = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+
+    const headers = ['ID','Camera','Source File','Person','Gender','Age','Explicit Parts','Confidence (%)'];
+    const lines   = [
+        headers.join(','),
+        ...rows.map(r => [
+            r.id,
+            escape(r.fromwhere),
+            escape(r.source_file),
+            escape(r.person_name),
+            escape(r.gender),
+            r.age || '',
+            escape(r.explicit_parts),
+            parseFloat(r.confidence || 0).toFixed(2)
+        ].join(','))
+    ];
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+        href:     url,
+        download: `surveillance_${new Date().toISOString().slice(0, 10)}.csv`
+    });
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ── Auto-refresh (polls /api/all_logs every 30 s) ────────────────────
+function toggleAutoRefresh() {
+    const on  = document.getElementById('autoRefresh').checked;
+    const dot = document.getElementById('statusDot');
+    if (on) {
+        _refreshTimer = setInterval(loadLogs, 30_000);
+        dot.classList.add('live');
+    } else {
+        clearInterval(_refreshTimer);
+        _refreshTimer = null;
+        dot.classList.remove('live');
+    }
+}
+
+document.getElementById('autoRefresh').addEventListener('change', toggleAutoRefresh);
+
+// ── Add to Baseline prompt ───────────────────────────────────────────
+async function promptAddToBaseline(path) {
+    const name = prompt('Enter the person\'s name for the training baseline folder:');
+    if (!name || !name.trim()) return;
+
+    try {
+        const res  = await fetch('/add_to_baseline', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ path, new_name: name.trim() })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            alert(`✓ Added as "${name.trim()}". Face cache will rebuild on the next scan.`);
+        } else {
+            alert('Error: ' + (data.message || 'Could not add to baseline.'));
+        }
+    } catch (e) {
+        alert('Network error while adding to baseline.');
+        console.error(e);
+    }
+}
+
+loadLogs();
+// --- EVENT MANAGER LOGIC ---
+function openEventModal() {
+    document.getElementById('eventModal').style.display = 'flex';
+    fetchEventsConfig();
+}
+
+function closeEventModal(event) {
+    if (event && event.target.id !== 'eventModal' && event.target.className !== 'close-btn') return;
+    document.getElementById('eventModal').style.display = 'none';
+}
+
+async function fetchEventsConfig() {
+    try {
+const res = await fetch('/api/events');
+const data = await res.json();
+currentEventsConfig = data;
+if (!currentEventsConfig.events) currentEventsConfig.events = [];
+renderEventsForm();
+    } catch (e) {
+console.error("Failed to load events config", e);
+currentEventsConfig = { events: [] };
+renderEventsForm();
+    }
+}
+
+function renderEventsForm() {
+    const container = document.getElementById('events-container');
+    container.innerHTML = '';
+    if (currentEventsConfig.events.length === 0) {
+container.innerHTML = '<p style="color: var(--text-muted); text-align: center;">No events configured. Click "Add New Event" to start.</p>';
+return;
+    }
+
+    currentEventsConfig.events.forEach((event, index) => {
+// Ensure the current trigger is always an option, even if not in systemBaselines
+let currentTriggerVal = event.trigger || "unknown";
+let triggerOptions = `
+    <option value="nudity" ${currentTriggerVal === 'nudity' ? 'selected' : ''}>Explicit (Nudity)</option>
+    <option value="anyone" ${currentTriggerVal === 'anyone' ? 'selected' : ''}>Anyone (Any Detected Face)</option>
+    <option value="unknown" ${currentTriggerVal === 'unknown' ? 'selected' : ''}>Unknown Person</option>
+`;
+
+// Track faces we've already added to avoid duplicates
+let addedFaces = new Set(['nudity', 'anyone', 'unknown']);
+
+// If the current trigger is a specific face not in the standard list, add it first
+if (!addedFaces.has(currentTriggerVal)) {
+     triggerOptions += `<option value="${currentTriggerVal}" selected>Face: ${currentTriggerVal} (Saved)</option>`;
+     addedFaces.add(currentTriggerVal);
+}
+
+// Add remaining faces from the database dynamically using the dashboard's loaded records
+const systemBaselines = [...new Set(allLogs.map(log => log.person_name).filter(name => name && name !== 'Unknown'))];
+systemBaselines.forEach(person => {
+    const val = person.toLowerCase();
+    if (!addedFaces.has(val)) {
+triggerOptions += `<option value="${val}">Face: ${person}</option>`;
+addedFaces.add(val);
+    }
+});
+
+const div = document.createElement('div');
+div.style.background = '#0b1120';
+div.style.padding = '15px';
+div.style.marginBottom = '15px';
+div.style.borderRadius = '8px';
+div.style.border = '1px solid var(--border-color)';
+
+div.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+<h3 style="margin:0; color: var(--accent-blue); text-transform: uppercase;">${event.id}</h3>
+<div style="display: flex; gap: 10px; align-items: center;">
+    <label class="checkbox-label" style="font-weight: bold; color: ${event.enabled ? '#22c55e' : 'var(--text-muted)'}; margin-right: 10px;">
+<input type="checkbox" ${event.enabled ? 'checked' : ''} onchange="updateEvent(${index}, 'enabled', this.checked)"> ENABLED
+    </label>
+    <button class="nav-btn" style="padding: 4px 8px; font-size: 0.8rem; background: var(--card-bg); border: 1px solid var(--text-muted);" onclick="duplicateEvent(${index})">Copy</button>
+    <button class="nav-btn delete-btn" style="padding: 4px 8px; font-size: 0.8rem;" onclick="deleteEvent(${index})">Delete</button>
+</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+<div>
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Type</span></label>
+    <select onchange="updateEvent(${index}, 'type', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: #334155; color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+<option value="tts" ${event.type === 'tts' ? 'selected' : ''}>Text-to-Speech (TTS)</option>
+<option value="command" ${event.type === 'command' ? 'selected' : ''}>System Command</option>
+<option value="light" ${event.type === 'light' ? 'selected' : ''}>Light Control (Smart Home)</option>
+    </select>
+</div>
+<div>
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Trigger When Detected</span></label>
+    <select onchange="updateEvent(${index}, 'trigger', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: #334155; color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+${triggerOptions}
+    </select>
+</div>
+
+<div>
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Device Trigger (Camera ID)</span></label>
+    <input type="text" value="${event.device_trigger_from || ''}" onchange="updateEvent(${index}, 'device_trigger_from', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="Blank for all devices">
+</div>
+
+<div>
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">From Where</span></label>
+    <input type="text" value="${event.fromwhere || ''}" onchange="updateEvent(${index}, 'fromwhere', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="e.g. Front Camera">
+</div>
+
+<div style="grid-column: span 2;">
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Action Payload</span></label>
+    <input type="text" value="${event.action || ''}" onchange="updateEvent(${index}, 'action', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="${event.type === 'tts' ? 'Text to speak...' : 'Command or light name...'}">
+</div>
+
+<div style="display: ${event.type === 'tts' ? 'block' : 'none'};">
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">TTS Voice</span></label>
+    <select onchange="updateEvent(${index}, 'voice', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+<option value="af_heart" ${event.voice === 'af_heart' ? 'selected' : ''}>Female (Default)</option>
+<option value="am_echo" ${event.voice === 'am_echo' ? 'selected' : ''}>Male</option>
+<option value="af_nicole" ${event.voice === 'af_nicole' ? 'selected' : ''}>Nicole (Female)</option>
+<option value="ef_dora" ${event.voice === 'ef_dora' ? 'selected' : ''}>Dora (Spanish Female)</option>
+<option value="bf_emma" ${event.voice === 'bf_emma' ? 'selected' : ''}>Emma (British Female)</option>
+<option value="am_onyx" ${event.voice === 'am_onyx' ? 'selected' : ''}>Onyx (Male)</option>
+    </select>
+</div>
+<div style="display: ${event.type === 'tts' ? 'flex' : 'none'}; gap: 10px; align-items: flex-end;">
+    <div style="flex: 1;">
+<label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">TTS Speed</span></label>
+<input type="number" step="0.1" min="0.5" max="2.0" value="${event.speed || 1.0}" onchange="updateEvent(${index}, 'speed', parseFloat(this.value))" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+    </div>
+    <button class="nav-btn" style="padding: 6px; font-size: 0.8rem; height: 32px;" onclick="testVoice(${index})">🔊 Test Voice</button>
+</div>
+
+<div>
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Cooldown (Seconds)</span></label>
+    <input type="number" value="${event.cooldown || 60}" onchange="updateEvent(${index}, 'cooldown', parseInt(this.value) || 0)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+</div>
+
+<div>
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Schedule Start</span></label>
+    <input type="time" value="${event.schedule?.start || '00:00'}" onchange="updateEventSchedule(${index}, 'start', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+</div>
+<div>
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Schedule End</span></label>
+    <input type="time" value="${event.schedule?.end || '23:59'}" onchange="updateEventSchedule(${index}, 'end', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+</div>
+
+<div style="display: ${event.type === 'light' ? 'block' : 'none'};">
+    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Timeout (Light Only)</span></label>
+    <input type="number" value="${event.timeout || ''}" onchange="updateEvent(${index}, 'timeout', parseInt(this.value) || null)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="e.g. 60 (seconds)">
+</div>
+    </div>
+`;
+container.appendChild(div);
+    });
+}
+
+function updateEvent(index, field, value) {
+    currentEventsConfig.events[index][field] = value;
+    if (field === 'type') renderEventsForm();
+}
+
+function updateEventSchedule(index, field, value) {
+    if (!currentEventsConfig.events[index].schedule) {
+currentEventsConfig.events[index].schedule = { start: "00:00", end: "23:59" };
+    }
+    currentEventsConfig.events[index].schedule[field] = value;
+}
+
+function deleteEvent(index) {
+    if (confirm("Delete this event?")) {
+currentEventsConfig.events.splice(index, 1);
+renderEventsForm();
+    }
+}
+
+function addNewEvent() {
+    const newId = prompt("Enter a unique ID for this event (no spaces, e.g., 'front_door_alert'):");
+    if (!newId || newId.trim() === "") return;
+    if (!currentEventsConfig.events) currentEventsConfig.events = [];
+    
+    if (currentEventsConfig.events.some(e => e.id === newId.trim())) {
+alert("An event with that ID already exists.");
+return;
+    }
+    
+    currentEventsConfig.events.push({
+id: newId.trim(),
+type: "tts",
+trigger: "unknown",
+action: "",
+device_trigger_from: "",
+fromwhere: "",
+enabled: true,
+cooldown: 60,
+schedule: { start: "00:00", end: "23:59" }
+    });
+    renderEventsForm();
+    
+    const container = document.getElementById('events-container');
+    container.parentElement.scrollTop = container.parentElement.scrollHeight;
+}
+
+function duplicateEvent(index) {
+    const sourceEvent = currentEventsConfig.events[index];
+    const newId = prompt(`Enter a unique ID for the duplicated event (copying from '${sourceEvent.id}'):`, `${sourceEvent.id}_copy`);
+    if (!newId || newId.trim() === "") return;
+    
+    if (currentEventsConfig.events.some(e => e.id === newId.trim())) {
+alert("An event with that ID already exists.");
+return;
+    }
+    
+    const clonedEvent = JSON.parse(JSON.stringify(sourceEvent));
+    clonedEvent.id = newId.trim();
+    currentEventsConfig.events.push(clonedEvent);
+    renderEventsForm();
+}
+
+async function saveEvents() {
+    try {
+const res = await fetch('/api/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(currentEventsConfig)
+});
+if (res.ok) {
+    alert("Event configuration saved successfully!");
+    closeEventModal();
+} else alert("Failed to save event configuration.");
+    } catch (e) {
+console.error(e);
+alert("Network error while saving.");
+    }
+}
+
+async function testVoice(index) {
+    const event = currentEventsConfig.events[index];
+    const text = event.action || "This is a test of the selected voice system.";
+    const voice = event.voice || "af_heart";
+    const speed = parseFloat(event.speed) || 1.0;
+
+    try {
+const res = await fetch('/api/test_voice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text, voice: voice, speed: speed })
+});
+if (!res.ok) alert("Failed to trigger voice test. Check server logs.");
+    } catch (e) {
+console.error(e);
+alert("Network error while trying to test voice.");
+    }
+}
+
+
+// --- SECURITY MODAL LOGIC ---
+async function openSecurityModal() {
+    try {
+        // Fetch the current settings from your existing combined route
+        const res = await fetch('/api/security');
+        
+        if (res.ok) {
+            const data = await res.json();
+            
+            // Populate the input fields based on the JSON your route returns
+            document.getElementById('secDashUser').value = data.dash_user || '';
+            document.getElementById('secCamUser').value = data.cam_user || '';
+            document.getElementById('secCamIP').value = data.cam_ip || '';
+            
+            // Passwords remain blank for security (as designed in your Python route)
+            document.getElementById('secDashPass').value = '';
+            document.getElementById('secCamPass').value = '';
+        } else {
+            console.warn("Could not load existing security config.");
+        }
+    } catch (e) {
+        console.error("Network error while loading security config:", e);
+    }
+
+    // Show the modal
+    document.getElementById('securityModal').style.display = 'flex';
+}
+
+function closeSecurityModal(event) {
+    if (event && event.target.id !== 'securityModal' && event.target.className !== 'close-btn') return;
+    document.getElementById('securityModal').style.display = 'none';
+}
+
+async function saveSecurityConfig() {
+    const payload = {
+dash_user: document.getElementById('secDashUser').value,
+dash_pass: document.getElementById('secDashPass').value,
+cam_user: document.getElementById('secCamUser').value,
+cam_pass: document.getElementById('secCamPass').value,
+cam_ip: document.getElementById('secCamIP').value
+    };
+    try {
+const res = await fetch('/api/security', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+});
+const data = await res.json();
+if (res.ok) {
+    alert("Security configuration saved successfully. The system will now reload.");
+    window.location.reload();
+} else alert("Failed to save security config: " + data.message);
+    } catch (e) {
+console.error(e);
+alert("Network error. Check server logs.");
+    }
+}
+
+// ── Config Editor Modal ──────────────────────────────────────────────
+
+async function openConfigModal() {
+    document.getElementById('configModal').style.display = 'flex';
+    switchConfigTab('ini');
+    loadConfigFile();
+    loadCredentials();
+}
+
+function closeConfigModal(event) {
+    if (event && event.target.id !== 'configModal' && event.target.className !== 'close-btn') return;
+    document.getElementById('configModal').style.display = 'none';
+}
+
+function switchConfigTab(tab) {
+    ['ini', 'creds'].forEach(t => {
+        document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === tab);
+        document.getElementById(`config-tab-${t}`).style.display = (t === tab) ? 'block' : 'none';
+    });
+}
+
+// ── config.ini ───────────────────────────────────────────────────────
+
+async function loadConfigFile() {
+    const ta     = document.getElementById('configIniContent');
+    const msgEl  = document.getElementById('iniSaveMsg');
+    ta.value     = 'Loading…';
+    msgEl.textContent = '';
+
+    try {
+        const res  = await fetch('/api/config_file');
+        const data = await res.json();
+        if (data.status === 'success') {
+            ta.value = data.content;
+        } else {
+            ta.value = '';
+            msgEl.textContent = '✗ ' + (data.message || 'Could not load file');
+            msgEl.className   = 'save-msg err';
+        }
+    } catch (e) {
+        ta.value = '';
+        msgEl.textContent = '✗ Network error loading config.ini';
+        msgEl.className   = 'save-msg err';
+        console.error(e);
+    }
+}
+
+async function saveConfigFile() {
+    const content = document.getElementById('configIniContent').value;
+    const msgEl   = document.getElementById('iniSaveMsg');
+    msgEl.textContent = 'Saving…';
+    msgEl.className   = 'save-msg';
+
+    try {
+        const res  = await fetch('/api/config_file', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ content })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            msgEl.textContent = '✓ Saved — restart to apply changes';
+            msgEl.className   = 'save-msg';
+        } else {
+            msgEl.textContent = '✗ ' + (data.message || 'Save failed');
+            msgEl.className   = 'save-msg err';
+        }
+    } catch (e) {
+        msgEl.textContent = '✗ Network error';
+        msgEl.className   = 'save-msg err';
+        console.error(e);
+    }
+}
+
+// ── Credentials (login.env) ──────────────────────────────────────────
+
+function _setBadge(id, isSet) {
+    const el    = document.getElementById(id);
+    el.innerHTML = isSet ? '<span class="set-badge">set</span>' : '';
+}
+
+async function loadCredentials() {
+    try {
+        const res  = await fetch('/api/credentials');
+        const data = await res.json();
+        if (!res.ok) return;
+
+        // Populate non-sensitive (visible) fields
+        document.getElementById('cred_dash_user').value = data.dash_user  || '';
+        document.getElementById('cred_cam_ip').value    = data.cam_ip     || '';
+        document.getElementById('cred_cam_user').value  = data.cam_user   || '';
+
+        // Clear all password / token inputs (write-only — never pre-filled)
+        ['cred_dash_pass', 'cred_cam_pass', 'cred_sighthound_pass', 'cred_cube_token']
+            .forEach(id => { document.getElementById(id).value = ''; });
+
+        // Show "set" badge when a credential is already stored
+        _setBadge('badge_dash_pass',   data.dash_pass_set);
+        _setBadge('badge_cam_pass',    data.cam_pass_set);
+        _setBadge('badge_sighthound',  data.sighthound_pass_set);
+        _setBadge('badge_cube',        data.cube_token_set);
+
+    } catch (e) { console.error('Error loading credentials:', e); }
+}
+
+async function saveCredentials() {
+    const msgEl = document.getElementById('credSaveMsg');
+    msgEl.textContent = 'Saving…';
+    msgEl.className   = 'save-msg';
+
+    const payload = {
+        dash_user:       document.getElementById('cred_dash_user').value.trim(),
+        dash_pass:       document.getElementById('cred_dash_pass').value,
+        cam_ip:          document.getElementById('cred_cam_ip').value.trim(),
+        cam_user:        document.getElementById('cred_cam_user').value.trim(),
+        cam_pass:        document.getElementById('cred_cam_pass').value,
+        sighthound_pass: document.getElementById('cred_sighthound_pass').value,
+        cube_token:      document.getElementById('cred_cube_token').value,
+    };
+
+    try {
+        const res  = await fetch('/api/credentials', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            msgEl.textContent = '✓ Saved — restart required for some changes';
+            msgEl.className   = 'save-msg';
+            loadCredentials();   // refresh badges
+        } else {
+            msgEl.textContent = '✗ ' + (data.error || data.message || 'Save failed');
+            msgEl.className   = 'save-msg err';
+        }
+    } catch (e) {
+        msgEl.textContent = '✗ Network error';
+        msgEl.className   = 'save-msg err';
+        console.error(e);
+    }
+}
+
+// --- ESCAPE KEY TO CLOSE MODALS ---
+$(document).on('keydown', function(event) {
+    if (event.key === "Escape") {
+        // Find any visible element with the class 'modal' and hide it
+        $('.modal').hide(); 
+        
+        // If your modals use a dark background overlay, hide that too:
+        // $('.modal-overlay').hide(); 
+    }
+});
+
+</script>
+
+</body>
+</html>
