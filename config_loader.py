@@ -22,8 +22,205 @@ def fix_conf(name, value):
         return fixed_value
     return value
 
+def _create_sample_config_ini(path: str) -> None:
+    """Write a fully-commented sample config.ini to *path*."""
+    content = """\
+; ImageCheck — sample configuration file
+; Auto-created on first run.  Edit to match your environment, then restart.
+;
+; Priority order (lowest → highest):
+;   hardcoded defaults  <  this file  <  command-line arguments
+; Secrets (passwords, tokens) belong in login.env, not here.
+
+; ─────────────────────────────────────────────────────────────────────────────
+[General]
+; Which AI detectors to run.
+;   all         — face recognition + nudity detection (default)
+;   faceonly    — face recognition only  (faster, skips NudeNet)
+;   nudityonly  — nudity detection only  (skips ArcFace)
+mode = all
+
+; Set to true to suppress bounding boxes on all saved images.
+hide_boxes = false
+
+; Scan-only mode: supply a directory or a file-list (.txt / .json) to batch-
+; process an archive without entering monitoring mode.  Leave blank for normal
+; monitoring.  Example:  scanonly = G:\\Pictures\\2024
+scanonly =
+
+; Video processing: analyse every Nth frame.
+; Lower values are more thorough but significantly slower.
+;   30  — good balance for surveillance footage (default)
+;   10  — high-confidence, slower
+;   60  — fast pass, may miss brief events
+frame_skip = 30
+
+; ─────────────────────────────────────────────────────────────────────────────
+[Paths]
+; All paths default to subdirectories of the script folder if left blank.
+
+; Root directory.  All other relative paths are anchored here.
+; base_dir = C:\\ImageCheckDev
+
+; Inbox watched for new files in monitoring mode.
+; source_dir = C:\\ImageCheckDev\\Inbox
+
+; Known-face training images.  One subfolder per person, images inside.
+; training_dir = C:\\ImageCheckDev\\Baseline
+
+; Files that triggered a detection are moved here.
+; retained_media_dir = C:\\ImageCheckDev\\Retained_Media
+
+; Cropped face images and detection logs are saved here.
+; faces_dir = C:\\ImageCheckDev\\Output_Faces
+
+; Explicit-content frames and detection logs are saved here.
+; nudity_dir = C:\\ImageCheckDev\\Output_NUDITY
+
+; ─────────────────────────────────────────────────────────────────────────────
+[Web]
+; Interface the dashboard listens on.
+;   0.0.0.0   — accessible from any network interface (default)
+;   127.0.0.1 — localhost only
+host = 0.0.0.0
+
+; Dashboard port.
+port = 5001
+
+; Comma-separated list of IP addresses permitted to load the dashboard.
+; Requests from any other IP receive a 403 Forbidden response.
+; Add every LAN machine that needs access.
+allowed_ips = 127.0.0.1
+
+; ─────────────────────────────────────────────────────────────────────────────
+[AI]
+; Minimum cosine similarity (0.0 – 1.0) for a face to be matched against the
+; training set.  Lower = more lenient (more matches, more false positives).
+; Values above 1.0 are auto-divided by 100, so 25 → 0.25.
+facematch_conf = 0.25
+
+; Minimum YOLO confidence (0.0 – 1.0) for a person crop to be passed to the
+; downstream face and nudity detectors.
+yolo_conf_threshold = 0.25
+
+; ─────────────────────────────────────────────────────────────────────────────
+[NudeThresholds]
+; Minimum NudeNet confidence (0.0 – 1.0) required to flag each body-part class.
+; Raise a value to reduce false positives; lower it to catch more edge cases.
+; Values above 1.0 are auto-divided by 100.
+female_breast_exposed    = 0.35
+male_breast_exposed      = 0.35
+female_genitalia_exposed = 0.70
+male_genitalia_exposed   = 0.20
+buttocks_exposed         = 0.40
+
+; ─────────────────────────────────────────────────────────────────────────────
+[Camera_Front]
+; Live RTSP camera monitoring (runs as a background thread in monitoring mode).
+; Credentials are read from login.env — see CAMERA_IP, CAMERA_USER, CAMERA_PASS.
+enabled = false
+
+; Human-readable label used in log messages and saved snapshot filenames.
+camera_location = Front Camera
+
+; ─────────────────────────────────────────────────────────────────────────────
+[Sighthound]
+; Integration with Sighthound camera software.
+; Sighthound emails snapshots; this processor fetches them via IMAP,
+; renames them, and drops them into the inbox.
+
+; Root directory where the Sighthound archive is stored.
+; sighthound_dir = S:\\Sighthound
+
+; IMAP email address used to receive Sighthound alert emails.
+; email_user = alerts@example.com
+
+; Password goes in login.env as SIGHTHOUND_EMAIL_PASS — never put it here.
+
+; ─────────────────────────────────────────────────────────────────────────────
+[WebServer]
+; Optional extra directory accessible via the dashboard media viewer.
+; Useful for browsing a NAS archive without copying files to the output folders.
+; private_path = \\\\NAS\\Cameras\\Archive
+
+; ─────────────────────────────────────────────────────────────────────────────
+[Event]
+; Settings for the automation engine.
+; After first run these are also editable live in the dashboard Events panel
+; (stored in events.json — no restart required).
+
+; IP address of a Google / Nest speaker for TTS announcements.
+; speaker_ip = 192.168.1.200
+
+; URL of the local CubeScript relay server for smart-home triggers.
+cubescript_url = http://127.0.0.1:5000/trigger
+
+; IP of the Cube smart-home bridge.
+; cube_ip = 192.168.1.201
+
+; Bearer token for CubeScript — put it in login.env as CUBE_TOKEN instead.
+"""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    logger.info(f"[CONFIG] Sample config.ini created at: {path}")
+    logger.info("[CONFIG] Edit it to match your environment, then restart.")
+
+
+def _create_sample_login_env(path: str) -> None:
+    """Write a commented login.env template to *path*."""
+    content = """\
+# ImageCheck — secrets / credentials file
+# Auto-created on first run.
+#
+# This file is loaded by python-dotenv at startup.
+# Keep it private — do NOT commit it to version control.
+# Lines starting with # are comments and are ignored.
+
+# ── RTSP Camera ───────────────────────────────────────────────────────────────
+# Full address including port and stream path.
+# Example: 192.168.1.100:554/stream1
+CAMERA_IP=
+
+# RTSP authentication credentials
+CAMERA_USER=
+CAMERA_PASS=
+
+# ── Sighthound Email ──────────────────────────────────────────────────────────
+# Password for the email account that receives Sighthound alert emails.
+SIGHTHOUND_EMAIL_PASS=
+
+# ── CubeScript Automation ─────────────────────────────────────────────────────
+# Bearer token for the CubeScript smart-home relay.
+CUBE_TOKEN=
+
+# ── Dashboard Login ───────────────────────────────────────────────────────────
+# These are written automatically by the web UI after you log in with
+# admin/admin and change your credentials.  Do not edit manually.
+DASHBOARD_USER=
+DASHBOARD_PASS_HASH=
+
+# ── Flask Session Security ────────────────────────────────────────────────────
+# Auto-generated on first run by the web server.  Do not edit manually.
+FLASK_SECRET_KEY=
+"""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    logger.info(f"[CONFIG] Sample login.env created at: {path}")
+    logger.info("[CONFIG] Fill in your credentials, then restart.")
+
+
 def get_config():
     """Parses all configuration sources and returns a master dictionary."""
+    # ── Auto-create missing config files on first run ──────────────────────
+    _CONFIG_PATH = os.path.join(DEFAULT_BASE_DIR, "config.ini")
+    _ENV_PATH    = os.path.join(DEFAULT_BASE_DIR, "login.env")
+
+    if not os.path.exists(_CONFIG_PATH):
+        _create_sample_config_ini(_CONFIG_PATH)
+
+    if not os.path.exists(_ENV_PATH):
+        _create_sample_login_env(_ENV_PATH)
+
     # --- A. Hardcoded Defaults (Lowest Priority) ---
     DEFAULTS = {
         "mode": "all",
@@ -66,10 +263,9 @@ def get_config():
 
     # --- B. Read config.ini (Medium Priority) ---
     config = configparser.ConfigParser()
-    config_file_path = "config.ini"
 
-    if os.path.exists(config_file_path):
-        config.read(config_file_path)
+    if os.path.exists(_CONFIG_PATH):
+        config.read(_CONFIG_PATH)
         
         # Map sections and keys from INI to our DEFAULTS dictionary
         if "General" in config:
