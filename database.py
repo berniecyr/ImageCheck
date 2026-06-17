@@ -1,7 +1,6 @@
 import os
 import sqlite3
 
-
 # Path normalisation is applied consistently everywhere so Windows
 # case-insensitive paths compare correctly (os.path.normcase lowercases
 # drive letters and path components on Windows; it is a no-op on Linux).
@@ -10,7 +9,6 @@ def _norm(path: str) -> str:
 
 
 class Database:
-
     def __init__(self, db_path):
         self.db_path = db_path
 
@@ -22,82 +20,66 @@ class Database:
     # ------------------------------------------------------------------
     # Schema
     # ------------------------------------------------------------------
-
     def initialize(self):
         conn = self.get_connection()
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
 
-            # ── Detection results (existing table, unchanged) ──────────
+            # ── Detection results ───────────────────────────────────────
             conn.execute(
-                '''
+                """
                 CREATE TABLE IF NOT EXISTS logs (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp       DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-                    source_file     TEXT,
-                    fromwhere       TEXT,
-                    frame_number    INTEGER,
-
-                    person_name     TEXT,
-                    gender          TEXT,
-                    age             INTEGER,
-
-                    is_explicit     INTEGER DEFAULT 0,
-                    explicit_parts  TEXT,
-                    confidence      REAL,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    source_file TEXT,
+                    fromwhere TEXT,
+                    frame_number INTEGER,
+                    person_name TEXT,
+                    gender TEXT,
+                    age INTEGER,
+                    is_explicit INTEGER DEFAULT 0,
+                    explicit_parts TEXT,
+                    confidence REAL,
                     face_confidence REAL,
-
-                    faces_path      TEXT,
-                    nudity_path     TEXT
+                    faces_path TEXT,
+                    nudity_path TEXT
                 )
-                '''
+                """
             )
 
-            # ── Scan deduplication (new table) ─────────────────────────
+            # ── Scan deduplication ──────────────────────────────────────
             #
             # Fingerprint = (file_path, file_size, file_mtime).
             #
-            # Why not SHA-256?  Hashing 200,000 surveillance files at
-            # startup means reading hundreds of GB before any AI work
-            # starts.  Surveillance footage is write-once; size+mtime
-            # catches every real-world change (re-export, correction)
-            # in microseconds via a single os.stat() call.
-            #
-            # Why not path alone?  Guards against the rare case where a
-            # file at the same path is replaced with different content
-            # (e.g. a corrected export) – it will be rescanned.
+            # Why not SHA-256? Hashing 200,000 surveillance files at startup
+            # means reading hundreds of GB before any AI work starts.
+            # Surveillance footage is write-once; size+mtime catches every
+            # real-world change in microseconds via a single os.stat() call.
             conn.execute(
-                '''
+                """
                 CREATE TABLE IF NOT EXISTS scan_history (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     -- Fingerprint ----------------------------------
-                    file_path       TEXT    NOT NULL UNIQUE,
-                    file_size       INTEGER NOT NULL DEFAULT 0,
-                    file_mtime      REAL    NOT NULL DEFAULT 0,
-
+                    file_path  TEXT    NOT NULL UNIQUE,
+                    file_size  INTEGER NOT NULL DEFAULT 0,
+                    file_mtime REAL    NOT NULL DEFAULT 0,
                     -- Best available capture date ------------------
-                    -- Priority: EXIF → ffprobe → filename → mtime
-                    media_date      TEXT,
-
+                    -- Priority: EXIF -> ffprobe -> filename -> mtime
+                    media_date TEXT,
                     -- Audit columns --------------------------------
-                    processed_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    scan_source     TEXT     -- directory or list-file path
+                    processed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    scan_source  TEXT   -- directory or list-file path
                 )
-                '''
+                """
             )
 
-            # The UNIQUE constraint on file_path already creates an
-            # implicit B-tree index, but an explicit covering index on
-            # (file_path, file_size, file_mtime) lets SQLite satisfy
-            # the single-row lookup in get_processed_fingerprints()
-            # without touching the table data pages at all.
+            # Explicit covering index so the single-row lookup in
+            # get_processed_fingerprints() avoids touching table data pages.
             conn.execute(
-                '''
+                """
                 CREATE INDEX IF NOT EXISTS idx_scan_history_fingerprint
                 ON scan_history (file_path, file_size, file_mtime)
-                '''
+                """
             )
 
             conn.commit()
@@ -107,7 +89,6 @@ class Database:
     # ------------------------------------------------------------------
     # scan_history — write
     # ------------------------------------------------------------------
-
     def mark_file_processed(
         self,
         file_path: str,
@@ -122,17 +103,17 @@ class Database:
         """
         norm_path = _norm(file_path)
         try:
-            st         = os.stat(file_path)
-            file_size  = st.st_size
+            st = os.stat(file_path)
+            file_size = st.st_size
             file_mtime = st.st_mtime
         except OSError:
-            file_size  = 0
+            file_size = 0
             file_mtime = 0.0
 
         conn = self.get_connection()
         try:
             conn.execute(
-                '''
+                """
                 INSERT INTO scan_history
                     (file_path, file_size, file_mtime, media_date, scan_source)
                 VALUES (?, ?, ?, ?, ?)
@@ -142,7 +123,7 @@ class Database:
                     media_date   = excluded.media_date,
                     processed_at = CURRENT_TIMESTAMP,
                     scan_source  = excluded.scan_source
-                ''',
+                """,
                 (norm_path, file_size, file_mtime, media_date, scan_source),
             )
             conn.commit()
@@ -151,7 +132,7 @@ class Database:
 
     def clear_scan_history(self) -> int:
         """
-        Delete all scan_history rows.  Returns the number of rows removed.
+        Delete all scan_history rows. Returns the number of rows removed.
         Call this to force a full rescan on the next launch.
         """
         conn = self.get_connection()
@@ -165,14 +146,13 @@ class Database:
     # ------------------------------------------------------------------
     # scan_history — read
     # ------------------------------------------------------------------
-
     def get_processed_fingerprints(self) -> dict:
         """
-        Return a dict  { normalised_path : (file_size, file_mtime) }
+        Return a dict { normalised_path : (file_size, file_mtime) }
         for every row in scan_history.
 
         Load this ONCE at the start of a scan session and do Python
-        dict lookups per file — one DB query instead of 200,000.
+        dict lookups per file — one DB query instead of N individual ones.
         Memory cost: ~20 MB for 200,000 paths at 100 bytes each.
         """
         conn = self.get_connection()
@@ -180,10 +160,7 @@ class Database:
             rows = conn.execute(
                 "SELECT file_path, file_size, file_mtime FROM scan_history"
             ).fetchall()
-            return {
-                row["file_path"]: (row["file_size"], row["file_mtime"])
-                for row in rows
-            }
+            return {row["file_path"]: (row["file_size"], row["file_mtime"]) for row in rows}
         finally:
             conn.close()
 
@@ -207,7 +184,6 @@ class Database:
     # ------------------------------------------------------------------
     # logs — read
     # ------------------------------------------------------------------
-
     def get_recent_logs(self, limit=100):
         conn = self.get_connection()
         try:
@@ -239,9 +215,86 @@ class Database:
             conn.close()
 
     # ------------------------------------------------------------------
+    # Stats — computed entirely in SQL so we never load the full table
+    # into Python memory.  Replaces the old get_all_logs() + Counter
+    # pattern that was used in /api/stats.
+    # ------------------------------------------------------------------
+    def get_stats(self) -> dict:
+        """
+        Return dashboard summary counts using SQL aggregation.
+
+        Previous approach loaded every row into Python and ran Counter()
+        over them — slow and memory-hungry on large databases.  These
+        targeted queries return only the aggregated numbers.
+        """
+        conn = self.get_connection()
+        try:
+            total = conn.execute("SELECT COUNT(*) FROM logs").fetchone()[0]
+
+            explicit_count = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM logs
+                WHERE explicit_parts IS NOT NULL
+                  AND LOWER(TRIM(explicit_parts)) NOT IN ('', 'none')
+                """
+            ).fetchone()[0]
+
+            face_count = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM logs
+                WHERE faces_path IS NOT NULL
+                  AND TRIM(faces_path) != ''
+                """
+            ).fetchone()[0]
+
+            # Per-category explicit breakdown
+            raw_parts = conn.execute(
+                """
+                SELECT explicit_parts
+                FROM logs
+                WHERE explicit_parts IS NOT NULL
+                  AND LOWER(TRIM(explicit_parts)) NOT IN ('', 'none')
+                """
+            ).fetchall()
+
+            from collections import Counter
+            parts_counter: Counter = Counter()
+            for (raw,) in raw_parts:
+                for part in raw.split(","):
+                    p = part.strip().upper()
+                    if p:
+                        parts_counter[p] += 1
+
+            # Per-person counts (top 20, excluding unknown/empty)
+            person_rows = conn.execute(
+                """
+                SELECT person_name, COUNT(*) AS cnt
+                FROM logs
+                WHERE person_name IS NOT NULL
+                  AND TRIM(person_name) != ''
+                  AND LOWER(TRIM(person_name)) != 'unknown'
+                GROUP BY person_name
+                ORDER BY cnt DESC
+                LIMIT 20
+                """
+            ).fetchall()
+            person_counter = {row["person_name"]: row["cnt"] for row in person_rows}
+
+            return {
+                "total": total,
+                "explicit": explicit_count,
+                "faces": face_count,
+                "by_category": dict(parts_counter.most_common()),
+                "by_person": person_counter,
+            }
+        finally:
+            conn.close()
+
+    # ------------------------------------------------------------------
     # logs — write / delete
     # ------------------------------------------------------------------
-
     def insert_log(
         self,
         source_file,
@@ -261,9 +314,8 @@ class Database:
             fromwhere = ""
             if source_file:
                 fromwhere = os.path.basename(os.path.dirname(source_file))
-
             conn.execute(
-                '''
+                """
                 INSERT INTO logs (
                     source_file, fromwhere, frame_number,
                     person_name, gender, age,
@@ -271,7 +323,7 @@ class Database:
                     faces_path, nudity_path
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
+                """,
                 (
                     source_file, fromwhere, frame_number,
                     person_name, gender, age,
