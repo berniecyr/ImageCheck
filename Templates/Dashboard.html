@@ -1,1966 +1,954 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ImageCheck Dashboard</title>
+  <style>
+    /* ── Reset & base ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d26;
+      --border:    #2a2d3a;
+      --accent:    #6c63ff;
+      --accent2:   #ff6584;
+      --text:      #e2e8f0;
+      --muted:     #8892a4;
+      --danger:    #e55353;
+      --success:   #48bb78;
+      --warn:      #ed8936;
+      --radius:    10px;
+      --shadow:    0 2px 12px rgba(0,0,0,.4);
+    }
+    html, body { height: 100%; font-family: system-ui, -apple-system, sans-serif;
+                 font-size: 14px; color: var(--text); background: var(--bg); }
 
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .app { display: flex; height: 100vh; overflow: hidden; }
 
-<title>AI Security Monitor</title>
+    /* Sidebar */
+    .sidebar {
+      width: 220px; flex-shrink: 0; background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; padding: 20px 12px;
+    }
+    .sidebar-logo { font-size: 18px; font-weight: 700; color: var(--accent);
+                    margin-bottom: 28px; padding-left: 8px; letter-spacing: .5px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 8px; cursor: pointer;
+      color: var(--muted); font-weight: 500; transition: all .15s;
+      border: none; background: none; width: 100%; text-align: left;
+      font-size: 13.5px;
+    }
+    .nav-item:hover, .nav-item.active { background: rgba(108,99,255,.15); color: var(--text); }
+    .nav-item.active { color: var(--accent); }
+    .nav-icon { width: 18px; text-align: center; opacity: .75; }
+    .sidebar-footer { margin-top: auto; }
+    .logout-btn {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 9px 12px; border-radius: 8px; border: none; background: none;
+      color: var(--danger); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: background .15s;
+    }
+    .logout-btn:hover { background: rgba(229,83,83,.12); }
 
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    /* Main content */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar {
+      padding: 14px 28px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface);
+    }
+    .topbar-title { font-size: 16px; font-weight: 600; }
+    .topbar-status { display: flex; align-items: center; gap: 6px;
+                     font-size: 12px; color: var(--muted); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%;
+                  background: var(--success); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-<link rel="stylesheet"
-href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    .content { flex: 1; overflow-y: auto; padding: 24px 28px; }
 
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    /* Panels */
+    .panel { display: none; }
+    .panel.active { display: block; }
 
-<style>
+    /* ── Stat cards ─────────────────────────────────────────────── */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                 gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px;
+    }
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+                  color: var(--muted); margin-bottom: 6px; }
+    .stat-value { font-size: 32px; font-weight: 700; color: var(--text); }
+    .stat-value.danger { color: var(--danger); }
+    .stat-value.success { color: var(--success); }
 
-:root {
-    --bg: #0f172a;
-    --card: #1e293b;
-    --border: #334155;
-    --text: #f8fafc;
-    --muted: #94a3b8;
-    --blue: #2563eb;
-    --green: #10b981;
-    --red: #ef4444;
-}
+    /* ── Gallery ─────────────────────────────────────────────────── */
+    .section-title { font-size: 13px; font-weight: 600; color: var(--muted);
+                     text-transform: uppercase; letter-spacing: .07em;
+                     margin-bottom: 16px; margin-top: 28px; }
+    .gallery { display: grid;
+               grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+               gap: 14px; }
+    .gallery-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .gallery-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .gallery-thumb {
+      width: 100%; aspect-ratio: 16/9; object-fit: cover;
+      background: var(--border); display: block; cursor: pointer;
+    }
+    .gallery-thumb.missing {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: var(--muted);
+    }
+    .gallery-meta { padding: 10px 12px; }
+    .gallery-name { font-weight: 600; font-size: 13px; white-space: nowrap;
+                    overflow: hidden; text-overflow: ellipsis; }
+    .gallery-sub { font-size: 11px; color: var(--muted); margin-top: 3px;
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gallery-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+    .tag { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 600; }
+    .tag-face { background: rgba(108,99,255,.18); color: var(--accent); }
+    .tag-nudity { background: rgba(229,83,83,.18); color: var(--danger); }
+    .gallery-actions { display: flex; gap: 6px; padding: 0 12px 10px; }
+    .btn-xs {
+      flex: 1; padding: 5px 8px; border-radius: 6px; border: none;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-xs:hover { opacity: .8; }
+    .btn-delete { background: rgba(229,83,83,.15); color: var(--danger); }
+    .btn-baseline { background: rgba(108,99,255,.15); color: var(--accent); }
 
-body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: Segoe UI, sans-serif;
-    padding: 20px;
-}
+    /* ── Events panel ───────────────────────────────────────────── */
+    .events-toolbar {
+      display: flex; gap: 10px; align-items: center;
+      margin-bottom: 18px; flex-wrap: wrap;
+    }
+    .btn {
+      padding: 8px 16px; border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-ghost   { background: var(--surface); color: var(--text);
+                   border: 1px solid var(--border); }
+    .event-list { display: flex; flex-direction: column; gap: 12px; }
+    .event-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+      display: flex; gap: 14px; align-items: flex-start;
+    }
+    .event-card.disabled { opacity: .5; }
+    .event-body { flex: 1; min-width: 0; }
+    .event-header { display: flex; align-items: center; gap: 10px;
+                    margin-bottom: 6px; flex-wrap: wrap; }
+    .event-id { font-weight: 700; font-size: 13px; }
+    .event-badge { font-size: 10px; padding: 2px 8px; border-radius: 20px;
+                   font-weight: 700; text-transform: uppercase; }
+    .badge-tts   { background: rgba(72,187,120,.18); color: var(--success); }
+    .badge-light { background: rgba(237,137,54,.18);  color: var(--warn); }
+    .event-detail { font-size: 12px; color: var(--muted); }
+    .event-toggle { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    input[type="checkbox"].toggle { width: 36px; height: 20px; cursor: pointer; }
 
-.header {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px;
-    margin-bottom: 20px;
+    /* ── Forms / settings ───────────────────────────────────────── */
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media(max-width:700px){ .settings-grid { grid-template-columns: 1fr; } }
+    .field-group { background: var(--surface); border: 1px solid var(--border);
+                   border-radius: var(--radius); padding: 20px; }
+    .field-group h3 { font-size: 13px; font-weight: 700; color: var(--muted);
+                      text-transform: uppercase; letter-spacing: .06em;
+                      margin-bottom: 16px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; color: var(--muted);
+                   margin-bottom: 5px; font-weight: 600; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 8px 12px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); font-size: 13px; outline: none; transition: border .15s;
+    }
+    .field input:focus, .field textarea:focus { border-color: var(--accent); }
+    .field textarea { min-height: 100px; resize: vertical; font-family: monospace; }
+    .field-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .set-indicator { font-size: 11px; color: var(--success); font-weight: 600;
+                     margin-left: 6px; }
 
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 20px;
-    flex-wrap: wrap;
-}
+    /* ── Feedback toast ─────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      padding: 12px 20px; border-radius: 10px; font-size: 13px;
+      font-weight: 600; pointer-events: none; opacity: 0;
+      transition: opacity .25s; box-shadow: var(--shadow);
+    }
+    #toast.show { opacity: 1; }
+    #toast.ok   { background: var(--success); color: #fff; }
+    #toast.err  { background: var(--danger);  color: #fff; }
 
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.status-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 12px var(--green);
-}
-
-.nav-controls {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.nav-btn {
-    border: none;
-    border-radius: 8px;
-    padding: 10px 16px;
-    cursor: pointer;
-    font-weight: 600;
-    color: white;
-    background: var(--blue);
-}
-
-.nav-btn:hover {
-    opacity: 0.92;
-}
-
-.delete-btn {
-    background: var(--red);
-}
-
-.settings-btn {
-    background: #475569;
-}
-
-.filters {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 15px;
-    margin-bottom: 20px;
-
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: center;
-}
-
-.filters input,
-.filters select,
-.modal input,
-.modal select,
-#events-container input,
-#events-container select {
-    background: #334155 !important; /* A medium-grey color */
-    border: 1px solid #475569;     /* A slightly lighter border */
-    color: white;
-    border-radius: 8px;
-    padding: 8px 10px;
-}
-
-#tableContainer,
-#cardContainer {
-
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px;
-}
-
-#cardContainer {
-    display: none;
-}
-
-.cards-grid {
-
-    display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(300px,1fr));
-    gap: 15px;
-}
-
-.card {
-
-    background: #111827;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    overflow: hidden;
-}
-
-.card-images {
-
-    display: grid;
-    grid-template-columns: 1fr 5fr;
-    gap: 2px;
-    background: black;
-}
-
-/* Base styles for all images in the grid */
-.card-images img {
-    width: 100%;
-    object-fit: contain;
-    background: black;
-    cursor: pointer;
-}
-
-/* Top Left: The Face Image */
-.card-images > img:nth-child(1) {
-    width: 100%;         /* Or whatever width you need, e.g., 80px */
-    aspect-ratio: 1 / 1; /* Forces a perfect square */
-    object-fit: cover;   /* Prevents squishing */
-    object-position: top left;
-}
-
-/* Right Side: The Explicit Landscape Image */
-.card-images > img:nth-child(2) {
-    width: 100%;          /* Fills the remaining column width */
-    aspect-ratio: 16 / 9; /* Forces a standard landscape shape (adjust as needed) */
-    object-fit: cover;    /* Ensures real images fill the box perfectly without stretching */
-    object-position: top center;
-}
-
-.card-content {
-    padding: 14px;
-}
-
-.card-row {
-    margin-bottom: 12px;
-}
-
-.label {
-    font-size: 0.75rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 4px;
-}
-
-.value {
-    font-size: 0.94rem;
-    word-break: break-word;
-}
-
-.thumb {
-
-    width: 140px;
-    height: 90px;
-    object-fit: contain;
-    background: black;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.modal {
-
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.95);
-    z-index: 5000;
-
-    justify-content: center;
-    align-items: center;
-}
-
-.modal img {
-
-    max-width: 96%;
-    max-height: 96%;
-}
-
-.close-modal {
-
-    position: absolute;
-    top: 20px;
-    right: 20px;
-
-    width: 42px;
-    height: 42px;
-
-    border: none;
-    border-radius: 50%;
-
-    background: var(--red);
-    color: white;
-    font-size: 22px;
-    cursor: pointer;
-}
-
-.dataTables_wrapper {
-    color: white;
-}
-
-table.dataTable tbody tr {
-    background: var(--card);
-}
-
-table.dataTable tbody td {
-    color: white;
-    vertical-align: middle;
-}
-
-@media(max-width:900px){
-
-    .card-images {
-        grid-template-columns: 1fr;
+    /* ── Lightbox ───────────────────────────────────────────────── */
+    #lightbox {
+      display: none; position: fixed; inset: 0; z-index: 900;
+      background: rgba(0,0,0,.85); align-items: center;
+      justify-content: center;
+    }
+    #lightbox.open { display: flex; }
+    #lightbox img {
+      max-width: 90vw; max-height: 90vh; border-radius: 8px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.6);
+    }
+    #lightbox-close {
+      position: absolute; top: 20px; right: 28px; font-size: 28px;
+      color: #fff; cursor: pointer; line-height: 1;
+      background: none; border: none;
     }
 
-    .thumb {
-        width: 100px;
-        height: 70px;
+    /* ── Baseline modal ─────────────────────────────────────────── */
+    #baseline-modal {
+      display: none; position: fixed; inset: 0; z-index: 950;
+      background: rgba(0,0,0,.7); align-items: center; justify-content: center;
     }
-}
+    #baseline-modal.open { display: flex; }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 28px; width: 340px;
+      box-shadow: var(--shadow);
+    }
+    .modal-box h3 { margin-bottom: 16px; }
+    .modal-box input {
+      width: 100%; padding: 9px 12px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); font-size: 13px; margin-bottom: 16px; outline: none;
+    }
+    .modal-box input:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 10px; }
 
-/* ── Stats Bar ─────────────────────────────────────── */
-.stats-bar {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-}
-
-.stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 22px;
-    flex: 1;
-    min-width: 110px;
-    text-align: center;
-    transition: border-color .2s;
-}
-
-.stat-value {
-    font-size: 1.8rem;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: 4px;
-    color: var(--text);
-}
-
-.stat-label {
-    font-size: 0.72rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: .05em;
-}
-
-.stat-card.s-red   { border-color: var(--red);   }
-.stat-card.s-red   .stat-value { color: var(--red);   }
-.stat-card.s-green { border-color: var(--green); }
-.stat-card.s-green .stat-value { color: var(--green); }
-.stat-card.s-blue  { border-color: var(--blue);  }
-.stat-card.s-blue  .stat-value { color: var(--blue);  }
-
-/* ── Auto-refresh pulse on status dot ─────────────── */
-@keyframes pulse {
-    0%, 100% { box-shadow: 0 0 12px var(--green); }
-    50%       { box-shadow: 0 0 22px var(--green), 0 0 6px #fff2; }
-}
-.status-dot.live { animation: pulse 1.4s ease-in-out infinite; }
-
-/* ── Config Editor Modal ───────────────────────────── */
-.config-tabs {
-    display: flex;
-    gap: 6px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-}
-
-.config-tab-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 8px 18px;
-    border-radius: 8px 8px 0 0;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.88rem;
-    transition: all .15s;
-}
-
-.config-tab-btn.active {
-    background: var(--blue);
-    border-color: var(--blue);
-    color: white;
-}
-
-.config-tab-btn:hover:not(.active) {
-    border-color: var(--blue);
-    color: var(--text);
-}
-
-.config-textarea {
-    width: 100%;
-    height: 420px;
-    background: #0a0f1e;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: #94a3b8;
-    font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 0.82rem;
-    line-height: 1.55;
-    padding: 14px;
-    resize: vertical;
-    box-sizing: border-box;
-    tab-size: 4;
-}
-
-.config-textarea:focus {
-    outline: none;
-    border-color: var(--blue);
-    color: var(--text);
-}
-
-.cfg-notice {
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 0.83rem;
-    margin-bottom: 16px;
-}
-
-.cfg-notice.warn {
-    background: #271e00;
-    border: 1px solid #f59e0b;
-    color: #f59e0b;
-}
-
-.cfg-notice.info {
-    background: #0f1e30;
-    border: 1px solid var(--blue);
-    color: #60a5fa;
-}
-
-.cred-section {
-    margin-bottom: 22px;
-    padding-bottom: 18px;
-    border-bottom: 1px solid var(--border);
-}
-
-.cred-section:last-child { border-bottom: none; margin-bottom: 0; }
-
-.cred-section h4 {
-    margin: 0 0 12px 0;
-    color: var(--blue);
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-}
-
-.cred-row {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.cred-field {
-    flex: 1;
-    min-width: 160px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.cred-field label {
-    font-size: 0.73rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: .04em;
-}
-
-.cred-field input {
-    background: #0a0f1e !important;
-    border: 1px solid var(--border) !important;
-    color: white !important;
-    border-radius: 8px !important;
-    padding: 9px 11px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    font-size: 0.88rem;
-}
-
-.cred-field input:focus {
-    outline: none !important;
-    border-color: var(--blue) !important;
-}
-
-.set-badge {
-    display: inline-block;
-    background: #1a3a1a;
-    color: var(--green);
-    border: 1px solid var(--green);
-    border-radius: 4px;
-    font-size: 0.65rem;
-    padding: 1px 5px;
-    margin-left: 5px;
-    vertical-align: middle;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-}
-
-.save-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-}
-
-.save-msg { font-size: 0.85rem; color: var(--green); }
-.save-msg.err { color: var(--red); }
-
-</style>
+    /* ── Empty state ─────────────────────────────────────────────── */
+    .empty { text-align: center; padding: 48px 0; color: var(--muted); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; }
+  </style>
 </head>
-
 <body>
 
-<div class="header">
+<div class="app">
 
-    <div class="header-left">
-        <div class="status-dot" id="statusDot"></div>
-        <h2>AI Security Monitor</h2>
+  <!-- ─── Sidebar ─────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">🔍 ImageCheck</div>
+    <nav>
+      <button class="nav-item active" onclick="showPanel('overview')">
+        <span class="nav-icon">📊</span> Overview
+      </button>
+      <button class="nav-item" onclick="showPanel('gallery')">
+        <span class="nav-icon">🖼️</span> Gallery
+      </button>
+      <button class="nav-item" onclick="showPanel('events')">
+        <span class="nav-icon">⚡</span> Events
+      </button>
+      <button class="nav-item" onclick="showPanel('security')">
+        <span class="nav-icon">🔐</span> Security
+      </button>
+      <button class="nav-item" onclick="showPanel('config')">
+        <span class="nav-icon">⚙️</span> Config
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="location.href='/logout'">
+        <span>⬅️</span> Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── Main ─────────────────────────────────────────────────────── -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="panel-title">Overview</span>
+      <div class="topbar-status">
+        <span class="status-dot"></span>
+        <span id="topbar-time"></span>
+      </div>
     </div>
 
-    <div class="nav-controls">
+    <div class="content">
 
-        <button class="nav-btn"
-        onclick="toggleView()">
-            Toggle View
-        </button>
-
-        <button class="nav-btn settings-btn"
-        onclick="openEventModal()">
-            🔔 Event Manager
-        </button>
-
-        <button class="nav-btn settings-btn"
-        onclick="openSecurityModal()">
-            🔒 Security Config
-        </button>
-
-        <button class="nav-btn delete-btn"
-        onclick="deleteSelected()">
-            Delete Selected
-        </button>
-
-        <button class="nav-btn settings-btn"
-        onclick="openConfigModal()">
-            ⚙ Config
-        </button>
-
-        <a href="/logout"
-        class="nav-btn"
-        style="text-decoration:none;display:flex;align-items:center;">
-            Logout
-        </a>
-
-    </div>
-</div>
-
-<!-- ── Stats Bar ───────────────────────────────────── -->
-<div class="stats-bar">
-    <div class="stat-card">
-        <div class="stat-value" id="statTotal">—</div>
-        <div class="stat-label">Total Records</div>
-    </div>
-    <div class="stat-card s-red">
-        <div class="stat-value" id="statExplicit">—</div>
-        <div class="stat-label">Explicit Events</div>
-    </div>
-    <div class="stat-card s-green">
-        <div class="stat-value" id="statFaces">—</div>
-        <div class="stat-label">Face Detections</div>
-    </div>
-    <div class="stat-card s-blue">
-        <div class="stat-value" id="statShowing">—</div>
-        <div class="stat-label">Showing</div>
-    </div>
-</div>
-
-<!-- ── Filters ────────────────────────────────────── -->
-<div class="filters">
-
-    <input type="text"
-    id="searchInput"
-    placeholder="🔍 Search all fields...">
-
-    <!-- PRIMARY FIX: default is "Any Explicit" so blank records are hidden by default -->
-    <select id="explicitFilter">
-        <option value="has_explicit">✓ Any Explicit</option>
-        <option value="all_records">All Records</option>
-        <option value="no_explicit">✗ Non-Explicit Only</option>
-        <!-- categories are appended dynamically from data -->
-    </select>
-
-    <select id="personFilter">
-        <option value="all">All People</option>
-    </select>
-
-    <select id="genderFilter">
-        <option value="all">All Genders</option>
-        <option value="Male">Male</option>
-        <option value="Female">Female</option>
-    </select>
-
-    <select id="cameraFilter">
-        <option value="all">All Cameras</option>
-    </select>
-
-    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;">
-        <input type="checkbox" id="showBlankRecords">
-        Show blank
-    </label>
-
-    <button class="nav-btn settings-btn"
-    onclick="resetFilters()"
-    style="white-space:nowrap;">
-        ↺ Reset
-    </button>
-
-    <button class="nav-btn settings-btn"
-    onclick="exportCSV()"
-    style="white-space:nowrap;">
-        ⬇ CSV
-    </button>
-
-    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;margin-left:auto;white-space:nowrap;">
-        <input type="checkbox" id="autoRefresh">
-        Auto-refresh
-    </label>
-
-    <span id="recordCount"
-    style="color:var(--muted);font-size:0.85rem;white-space:nowrap;"></span>
-
-</div>
-
-<div id="tableContainer">
-
-    <table id="logsTable"
-    class="display"
-    style="width:100%">
-
-        <thead>
-
-        <tr>
-
-            <th>
-                <input type="checkbox" id="selectAll">
-            </th>
-
-            <th>ID</th>
-            <th>From</th>
-            <th>Source</th>
-            <th>Person</th>
-            <th>Gender</th>
-            <th>Explicit Parts</th>
-            <th>Confidence</th>
-            <th>Face</th>
-            <th>Nudity</th>
-            <th>Actions</th>
-
-        </tr>
-
-        </thead>
-
-    </table>
-
-</div>
-
-<div id="cardContainer">
-
-    <div class="cards-grid"
-    id="cardsGrid"></div>
-
-</div>
-
-<div class="modal"
-id="imageModal">
-
-    <button class="close-modal"
-    onclick="closeModal()">
-        ×
-    </button>
-
-    <img id="modalImg">
-
-</div>
-
-<div class="modal" id="eventModal" onclick="closeEventModal(event)">
-    <div style="background: var(--card); width: 90%; max-width: 800px; padding: 25px; border-radius: 14px; border: 1px solid var(--border); max-height: 85vh; overflow-y: auto; position: relative;" onclick="event.stopPropagation()">
-        
-        <button class="close-btn" style="position: absolute; top: 15px; right: 15px; width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--red); color: white; font-size: 20px; cursor: pointer;" onclick="closeEventModal({target: this})">×</button>
-        <h2 style="margin-top: 0; margin-bottom: 20px;">🔔 Event Manager Configuration</h2>
-        
-        <div id="events-container"></div>
-        
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button class="nav-btn" style="background: var(--green);" onclick="addNewEvent()">+ Add New Event</button>
-            <button class="nav-btn" style="background: var(--blue); margin-left: auto;" onclick="saveEvents()">Save Configuration</button>
+      <!-- ── Overview panel ───────────────────────────────────────── -->
+      <div class="panel active" id="panel-overview">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total detections</div>
+            <div class="stat-value" id="stat-total">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Explicit content</div>
+            <div class="stat-value danger" id="stat-explicit">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Face detections</div>
+            <div class="stat-value success" id="stat-faces">—</div>
+          </div>
         </div>
-    </div>
-</div>
 
-<div class="modal" id="securityModal" onclick="closeSecurityModal(event)">
-    <div style="background: var(--card); width: 90%; max-width: 500px; padding: 25px; border-radius: 14px; border: 1px solid var(--border); position: relative;" onclick="event.stopPropagation()">
-        
-        <button class="close-btn" style="position: absolute; top: 15px; right: 15px; width: 35px; height: 35px; border-radius: 50%; border: none; background: var(--red); color: white; font-size: 20px; cursor: pointer;" onclick="closeSecurityModal({target: this})">×</button>
-        <h2 style="margin-top: 0; margin-bottom: 20px;">🔒 Security Configuration</h2>
-        
-        <div style="margin-bottom: 20px;">
-            <h3 style="margin-bottom: 10px; color: var(--blue);">Dashboard Login</h3>
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <input type="text" id="secDashUser" placeholder="Dashboard Username" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
-                <input type="password" id="secDashPass" placeholder="Dashboard Password" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
+        <div class="section-title">Top persons detected</div>
+        <div id="person-chart" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+
+        <div class="section-title">Explicit content breakdown</div>
+        <div id="category-chart" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+      </div>
+
+      <!-- ── Gallery panel ────────────────────────────────────────── -->
+      <div class="panel" id="panel-gallery">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+          <input id="gallery-search" type="search" placeholder="Filter by name or file…"
+            style="flex:1;min-width:180px;padding:8px 12px;border-radius:8px;
+                   border:1px solid var(--border);background:var(--bg);
+                   color:var(--text);font-size:13px;outline:none;"
+            oninput="filterGallery(this.value)">
+          <button class="btn btn-danger" onclick="bulkDelete()" id="bulk-delete-btn" style="display:none">
+            Delete selected
+          </button>
+        </div>
+        <div class="gallery" id="gallery-grid"></div>
+        <div class="empty" id="gallery-empty" style="display:none">
+          <div class="empty-icon">📂</div>
+          <div class="empty-text">No detections found.</div>
+        </div>
+      </div>
+
+      <!-- ── Events panel ─────────────────────────────────────────── -->
+      <div class="panel" id="panel-events">
+        <div class="events-toolbar">
+          <button class="btn btn-primary" onclick="saveEvents()">💾 Save events</button>
+          <button class="btn btn-ghost"   onclick="addEvent()">＋ Add event</button>
+          <button class="btn btn-ghost"   onclick="testVoice()">🔊 Test voice</button>
+        </div>
+        <div class="field-group" style="margin-bottom:20px;">
+          <h3>Global settings</h3>
+          <div class="settings-grid">
+            <div class="field">
+              <label>Speaker IP</label>
+              <input id="ev-speaker" type="text" placeholder="192.168.1.x">
             </div>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-            <h3 style="margin-bottom: 10px; color: var(--green);">Camera RTSP Credentials</h3>
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <input type="text" id="secCamUser" placeholder="Camera Username" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
-                <input type="password" id="secCamPass" placeholder="Camera Password" style="flex: 1; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
+            <div class="field">
+              <label>CubeScript URL</label>
+              <input id="ev-cube-url" type="text">
             </div>
-            <input type="text" id="secCamIP" placeholder="Camera IP Address (e.g., 192.168.1.100)" style="width: 100%; box-sizing: border-box; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 6px;">
+            <div class="field">
+              <label>Cube IP</label>
+              <input id="ev-cube-ip" type="text">
+            </div>
+            <div class="field">
+              <label>Cube token</label>
+              <input id="ev-cube-token" type="password" placeholder="(leave blank to keep current)">
+            </div>
+          </div>
         </div>
-        
-        <div style="display: flex; margin-top: 20px;">
-            <button class="nav-btn" style="background: var(--blue); width: 100%;" onclick="saveSecurityConfig()">Save & Restart System</button>
+        <div class="event-list" id="event-list"></div>
+      </div>
+
+      <!-- ── Security panel ───────────────────────────────────────── -->
+      <div class="panel" id="panel-security">
+        <div class="settings-grid">
+          <div class="field-group">
+            <h3>Dashboard credentials</h3>
+            <div class="field">
+              <label>Username</label>
+              <input id="sec-user" type="text" autocomplete="username">
+            </div>
+            <div class="field">
+              <label>New password</label>
+              <input id="sec-pass" type="password" autocomplete="new-password"
+                     placeholder="Leave blank to keep current">
+              <div class="field-hint">Password is stored as a bcrypt hash — never in plaintext.</div>
+            </div>
+            <button class="btn btn-primary" onclick="saveSecurity()">Save credentials</button>
+          </div>
+          <div class="field-group">
+            <h3>Camera / integrations</h3>
+            <div class="field">
+              <label>Camera IP</label>
+              <input id="sec-cam-ip" type="text" placeholder="192.168.1.x:554/stream1">
+            </div>
+            <div class="field">
+              <label>Camera username</label>
+              <input id="sec-cam-user" type="text">
+            </div>
+            <div class="field">
+              <label>Camera password</label>
+              <input id="sec-cam-pass" type="password" placeholder="Leave blank to keep current">
+            </div>
+            <div class="field">
+              <label>Sighthound email password</label>
+              <input id="sec-sh-pass" type="password" placeholder="Leave blank to keep current">
+            </div>
+            <button class="btn btn-primary" onclick="saveSecurity()">Save camera settings</button>
+          </div>
         </div>
-    </div>
+      </div>
+
+      <!-- ── Config panel ─────────────────────────────────────────── -->
+      <div class="panel" id="panel-config">
+        <div class="field-group">
+          <h3>config.ini — live editor</h3>
+          <div class="field">
+            <textarea id="config-editor" style="min-height:420px;"></textarea>
+            <div class="field-hint">Changes are validated for INI syntax before saving.
+              A restart is required to apply most settings.</div>
+          </div>
+          <button class="btn btn-primary" onclick="saveConfig()">💾 Save config.ini</button>
+        </div>
+      </div>
+
+    </div><!-- /.content -->
+  </div><!-- /.main -->
+</div><!-- /.app -->
+
+<!-- ─── Lightbox ───────────────────────────────────────────────────── -->
+<div id="lightbox" onclick="closeLightbox(event)">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="Preview">
 </div>
 
-<!-- ── Config Editor Modal ─────────────────────────── -->
-<div class="modal" id="configModal" onclick="closeConfigModal(event)">
-<div style="background:var(--card);width:90%;max-width:740px;padding:25px;border-radius:14px;border:1px solid var(--border);max-height:92vh;overflow-y:auto;position:relative;" onclick="event.stopPropagation()">
-
-    <button class="close-btn" style="position:absolute;top:15px;right:15px;width:35px;height:35px;border-radius:50%;border:none;background:var(--red);color:white;font-size:20px;cursor:pointer;" onclick="closeConfigModal({target:this})">×</button>
-
-    <h2 style="margin:0 0 20px 0;">⚙ Configuration Editor</h2>
-
-    <!-- Tabs -->
-    <div class="config-tabs">
-        <button class="config-tab-btn active" id="tab-btn-ini"   onclick="switchConfigTab('ini')">📄 config.ini</button>
-        <button class="config-tab-btn"         id="tab-btn-creds" onclick="switchConfigTab('creds')">🔒 Credentials</button>
+<!-- ─── Baseline modal ─────────────────────────────────────────────── -->
+<div id="baseline-modal" onclick="closeBaseline(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3>Add to baseline training</h3>
+    <input id="baseline-name" type="text" placeholder="Person name (letters only)"
+           maxlength="60">
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="submitBaseline()">Add</button>
+      <button class="btn btn-ghost"   onclick="closeBaseline()">Cancel</button>
     </div>
-
-    <!-- ── config.ini tab ───────────────────────────── -->
-    <div id="config-tab-ini">
-        <div class="cfg-notice warn">
-            ⚠ Editing the raw file. Changes take effect after restarting the application. Comments and formatting are preserved exactly as written.
-        </div>
-        <textarea id="configIniContent" class="config-textarea" spellcheck="false"></textarea>
-        <div class="save-row">
-            <button class="nav-btn" style="background:var(--blue);" onclick="saveConfigFile()">💾 Save config.ini</button>
-            <button class="nav-btn settings-btn" onclick="loadConfigFile()" style="padding:10px 14px;">↺ Reload</button>
-            <span id="iniSaveMsg" class="save-msg"></span>
-        </div>
-    </div>
-
-    <!-- ── Credentials (login.env) tab ──────────────── -->
-    <div id="config-tab-creds" style="display:none;">
-        <div class="cfg-notice warn">
-            ⚠ Passwords and tokens are write-only — existing values are never shown. Leave a field blank to keep its current value.
-        </div>
-        <div class="cfg-notice info" style="margin-bottom:20px;">
-            ℹ Sensitive fields (passwords, tokens) are stored in <code>login.env</code> and are gitignored. Non-sensitive fields (usernames, IPs) reflect the current stored value.
-        </div>
-
-        <!-- Dashboard Login -->
-        <div class="cred-section">
-            <h4>Dashboard Login</h4>
-            <div class="cred-row">
-                <div class="cred-field">
-                    <label>Username</label>
-                    <input type="text" id="cred_dash_user" placeholder="admin">
-                </div>
-                <div class="cred-field">
-                    <label>Password <span id="badge_dash_pass"></span></label>
-                    <input type="password" id="cred_dash_pass" placeholder="Leave blank to keep current">
-                </div>
-            </div>
-        </div>
-
-        <!-- Camera RTSP -->
-        <div class="cred-section">
-            <h4>Camera RTSP</h4>
-            <div class="cred-row">
-                <div class="cred-field">
-                    <label>IP Address</label>
-                    <input type="text" id="cred_cam_ip" placeholder="192.168.x.x">
-                </div>
-                <div class="cred-field">
-                    <label>Username</label>
-                    <input type="text" id="cred_cam_user" placeholder="admin">
-                </div>
-                <div class="cred-field">
-                    <label>Password <span id="badge_cam_pass"></span></label>
-                    <input type="password" id="cred_cam_pass" placeholder="Leave blank to keep current">
-                </div>
-            </div>
-        </div>
-
-        <!-- Sighthound -->
-        <div class="cred-section">
-            <h4>Sighthound Email</h4>
-            <div class="cred-row">
-                <div class="cred-field" style="max-width:380px;">
-                    <label>Google App Password <span id="badge_sighthound"></span></label>
-                    <input type="password" id="cred_sighthound_pass" placeholder="Leave blank to keep current">
-                </div>
-            </div>
-        </div>
-
-        <!-- Cube Automation -->
-        <div class="cred-section">
-            <h4>Cube Automation</h4>
-            <div class="cred-row">
-                <div class="cred-field" style="max-width:380px;">
-                    <label>API Token <span id="badge_cube"></span></label>
-                    <input type="password" id="cred_cube_token" placeholder="Leave blank to keep current">
-                </div>
-            </div>
-        </div>
-
-        <div class="save-row">
-            <button class="nav-btn" style="background:var(--blue);" onclick="saveCredentials()">💾 Save Credentials</button>
-            <span id="credSaveMsg" class="save-msg"></span>
-        </div>
-    </div>
-
+  </div>
 </div>
-</div>
+
+<!-- ─── Toast ──────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ─── Jinja2: pass server-rendered logs into JS ──────────────────── -->
+<script>
+/* NOTE: Jinja2 |tojson filter produces safe JSON — no additional escaping
+   needed here.  This replaces the old approach of building DOM from raw
+   template strings which was vulnerable to XSS if a filename or person_name
+   contained HTML special characters. */
+const INITIAL_LOGS = {{ logs | tojson }};
+</script>
 
 <script>
+/* ─────────────────────────────────────────────────────────────────────
+   Utilities
+   ───────────────────────────────────────────────────────────────────── */
 
-let allLogs = [];
-let table   = null;
-let cardMode = false;
-let currentEventsConfig = { settings: {}, events: [] };
-let _refreshTimer = null;
-
-function mediaUrl(path) {
-
-    return `/serve_media?path=${encodeURIComponent(path)}`;
+/** Show a brief status toast. */
+function toast(msg, ok = true) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + (ok ? 'ok' : 'err');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = ''; }, 3500);
 }
 
-function openImage(url) {
-
-    document.getElementById('imageModal').style.display = 'flex';
-
-    document.getElementById('modalImg').src = url;
+/**
+ * POST / PUT helper.
+ *
+ * FIX: Previously the dashboard had no CSRF protection.  We now send
+ * X-Requested-With on every mutating fetch so the server can (optionally)
+ * verify it wasn't triggered by a cross-origin form or script.
+ * Flask-Login's session cookie is SameSite=Lax by default in recent
+ * Werkzeug/Flask releases which also mitigates most CSRF vectors.
+ */
+async function api(url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',  // CSRF mitigation header
+    },
+    body: JSON.stringify(body),
+  });
+  return r.json();
 }
 
-function closeModal() {
-
-    document.getElementById('imageModal').style.display = 'none';
+function esc(s) {
+  // XSS-safe text: converts HTML special chars to entities.
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function getCurrentSortedRows() {
-
-    if (!table)
-        return allLogs;
-
-    return table
-        .rows({ search: 'applied', order: 'applied' })
-        .data()
-        .toArray();
+/** Update the topbar clock every second. */
+function startClock() {
+  const el = document.getElementById('topbar-time');
+  const tick = () => { el.textContent = new Date().toLocaleTimeString(); };
+  tick(); setInterval(tick, 1000);
 }
 
-function toggleView() {
+/* ─────────────────────────────────────────────────────────────────────
+   Panel navigation
+   ───────────────────────────────────────────────────────────────────── */
+const PANEL_TITLES = {
+  overview: 'Overview',
+  gallery:  'Gallery',
+  events:   'Events & Automation',
+  security: 'Security',
+  config:   'Config Editor',
+};
 
-    cardMode = !cardMode;
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
 
-    document.getElementById('tableContainer').style.display =
-        cardMode ? 'none' : 'block';
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b => {
+    if (b.textContent.toLowerCase().includes(PANEL_TITLES[name].split(' ')[0].toLowerCase()))
+      b.classList.add('active');
+  });
+  document.getElementById('panel-title').textContent = PANEL_TITLES[name];
 
-    document.getElementById('cardContainer').style.display =
-        cardMode ? 'block' : 'none';
-
-    if (cardMode) {
-        buildCards(getCurrentSortedRows());
-    }
+  // Lazy-load panel data
+  if (name === 'overview') loadStats();
+  if (name === 'events')   loadEvents();
+  if (name === 'security') loadCredentials();
+  if (name === 'config')   loadConfig();
 }
 
-async function loadLogs() {
-    const response = await fetch('/api/all_logs');
-    const json     = await response.json();
-
-    allLogs = json.data || [];
-
-    // Deduplicate explicit_parts entries that get stored twice
-    allLogs.forEach(log => {
-        if (log.explicit_parts) {
-            const parts = log.explicit_parts.split(',').map(p => p.trim()).filter(Boolean);
-            log.explicit_parts = [...new Set(parts)].join(', ');
-        }
-    });
-
-    updateStatsBar(allLogs);   // populate stats cards
-    populateFilters();          // rebuild all dropdowns
-    buildTable();               // init DataTables
-    applyFilters();             // apply the default "has_explicit" filter immediately
-}
-
-function populateFilters() {
-
-    const people     = new Set();
-    const cameras    = new Set();
-    const categories = new Set();
-
-    allLogs.forEach(log => {
-
-        // People
-        if (log.person_name) {
-            log.person_name.split(',').forEach(n => {
-                const clean = n.trim();
-                if (clean && !['unknown','testing'].includes(clean.toLowerCase()))
-                    people.add(clean);
-            });
-        }
-
-        // Cameras (fromwhere)
-        if (log.fromwhere && log.fromwhere.trim())
-            cameras.add(log.fromwhere.trim());
-
-        // Explicit categories — derived from real data, not a hardcoded list
-        if (log.explicit_parts) {
-            log.explicit_parts.split(',').forEach(p => {
-                const clean = p.trim().toUpperCase();
-                if (clean && clean !== 'NONE') categories.add(clean);
-            });
-        }
-    });
-
-    // ── Person filter ─────────────────────────────────
-    const personFilter  = document.getElementById('personFilter');
-    const savedPerson   = personFilter.value;
-    personFilter.innerHTML = '<option value="all">All People</option>';
-    [...people].sort().forEach(p => {
-        personFilter.innerHTML += `<option value="${p}">${p}</option>`;
-    });
-    if ([...people].includes(savedPerson)) personFilter.value = savedPerson;
-
-    // ── Explicit filter ───────────────────────────────
-    // Static anchor options come first; data-driven categories appended below.
-    const explicitFilter = document.getElementById('explicitFilter');
-    const savedExplicit  = explicitFilter.value || 'has_explicit';
-    explicitFilter.innerHTML = `
-        <option value="has_explicit">✓ Any Explicit</option>
-        <option value="all_records">All Records</option>
-        <option value="no_explicit">✗ Non-Explicit Only</option>
-    `;
-    if (categories.size > 0) {
-        explicitFilter.innerHTML += `<option disabled>── By Category ──</option>`;
-        [...categories].sort().forEach(cat => {
-            explicitFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
-        });
-    }
-    // Restore previous selection if it still exists
-    const validValues = [...explicitFilter.options].map(o => o.value);
-    explicitFilter.value = validValues.includes(savedExplicit) ? savedExplicit : 'has_explicit';
-
-    // ── Camera filter ─────────────────────────────────
-    const cameraFilter = document.getElementById('cameraFilter');
-    const savedCamera  = cameraFilter.value;
-    cameraFilter.innerHTML = '<option value="all">All Cameras</option>';
-    [...cameras].sort().forEach(cam => {
-        cameraFilter.innerHTML += `<option value="${cam}">${cam}</option>`;
-    });
-    if ([...cameras].includes(savedCamera)) cameraFilter.value = savedCamera;
-}
-
-function buildTable() {
-
-    if ($.fn.DataTable.isDataTable('#logsTable')) {
-
-        $('#logsTable').DataTable().destroy();
-    }
-
-    table = $('#logsTable').DataTable({
-
-        data: allLogs,
-
-        pageLength: 100,
-
-        order: [[1,'desc']],
-
-        columns: [
-
-            {
-                data: null,
-                orderable: false,
-
-                render: function(data) {
-
-                    return `
-                        <input
-                            type="checkbox"
-                            class="record-checkbox"
-                            value="${data.id}">
-                    `;
-                }
-            },
-
-            {
-                data: 'id',
-                // 2. Enforce numerical sorting so 990 correctly follows 989
-                type: 'num'
-            },
-
-            {
-                data: 'fromwhere',
-                defaultContent: ''
-            },
-
-            {
-                data: 'source_file',
-
-                render: function(data) {
-
-                    if (!data)
-                        return '';
-
-                    return data.split(/[\\/]/).pop();
-                }
-            },
-
-            {
-                data: 'person_name',
-                defaultContent: 'Unknown'
-            },
-
-            {
-                data: 'gender',
-                defaultContent: '—'
-            },
-
-            {
-                data: 'explicit_parts',
-                defaultContent: 'None'
-            },
-
-            {
-                data: 'confidence',
-
-                render: function(data) {
-
-                    return data
-                        ? parseFloat(data).toFixed(2) + '%'
-                        : '0%';
-                }
-            },
-
-            {
-                data: 'faces_path',
-                orderable: false,
-
-                render: function(data) {
-
-                    if (!data)
-                        return '—';
-
-                    const url = mediaUrl(data);
-
-                    return `
-                        <img
-                            class="thumb"
-                            src="${url}"
-                            onclick="openImage('${url}')">
-                    `;
-                }
-            },
-
-            {
-                data: null,
-                orderable: false,
-
-                render: function(row) {
-
-                    let preview = null;
-
-                    // PRIORITIZE NUDITY PATH FIRST
-                    // Flask will auto-heal stale paths now
-
-                    if (row.nudity_path) {
-
-                        preview = mediaUrl(row.nudity_path);
-                    }
-                    else if (row.source_file) {
-
-                        preview = mediaUrl(row.source_file);
-                    }
-
-                    if (!preview)
-                        return '—';
-
-                    return `
-                        <img
-                            class="thumb"
-                            src="${preview}"
-                            onclick="openImage('${preview}')">
-                    `;
-                }
-            },
-
-            {
-                data: null,
-                orderable: false,
-
-                render: function(data) {
-
-                    return `
-                        <button
-                            class="nav-btn delete-btn"
-                            onclick="deleteLog(${data.id})">
-                            Delete
-                        </button>
-                    `;
-                }
-            }
-
-        ]
-    });
-}
-
-function buildCards(logs) {
-
-    const grid =
-        document.getElementById('cardsGrid');
-
-    grid.innerHTML = '';
-
-    logs.forEach(log => {
-
-        const faceImage = log.faces_path
-            ? mediaUrl(log.faces_path)
-            : '';
-
-        let nudityPreview = '';
-
-        // FIX: Prioritize nudity_path first, matching the list view logic
-        if (log.nudity_path) {
-
-            nudityPreview = mediaUrl(log.nudity_path);
-        }
-        else if (log.source_file) {
-
-            nudityPreview = mediaUrl(log.source_file);
-        }
-
-        // 1. Define a 1x1 transparent placeholder pixel
-        const emptyPixel = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-
-        // 2. Add an 'onerror' fallback to instantly replace broken 404 images
-        const face = faceImage
-            ? `<img src="${faceImage}" onclick="openImage('${faceImage}')" onerror="this.onerror=null; this.src='${emptyPixel}';">`
-            : `<img src="${emptyPixel}">`;
-
-        const nudity = nudityPreview
-            ? `<img src="${nudityPreview}" onclick="openImage('${nudityPreview}')" onerror="this.onerror=null; this.src='${emptyPixel}';">`
-            : `<img src="${emptyPixel}">`;
-
-        const card = document.createElement('div');
-
-        card.className = 'card';
-
-        // Set the primary saved path for display tracking
-        const savedLocation = log.nudity_path || log.faces_path || 'None';
-
-        card.innerHTML = `
-
-            <div class="card-images">
-                ${face}
-                ${nudity}
-            </div>
-
-            <div class="card-content" style="padding: 12px;">
-
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 0.85rem; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                    
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <input type="checkbox" class="record-checkbox" value="${log.id}" style="margin: 0; cursor: pointer;">
-                        <span style="color: var(--muted);">ID:</span> <strong>${log.id || ''}</strong>
-                    </div>
-
-                    <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 110px;">
-                        <span style="color: var(--muted);">👤</span> <strong>${log.person_name || 'Unknown'}</strong>
-                    </div>
-
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <span style="color: var(--muted);">Conf:</span> <strong style="color: var(--green);">${log.confidence || 0}%</strong>
-                    </div>
-
-                </div>
-
-                <div class="card-row" style="margin-bottom: 10px;">
-                    <div class="label" style="display: inline-block; margin-right: 6px;">Explicit Parts:</div>
-                    <div class="value" style="display: inline-block; font-size: 0.85rem;">${log.explicit_parts || 'None'}</div>
-                </div>
-
-                <div style="font-size: 0.7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;">
-                    <span class="label" style="display: inline; margin-right: 4px;">Source:</span>${log.source_file || ''}
-                </div>
-                
-                <div style="font-size: 0.7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 12px;">
-                    <span class="label" style="display: inline; margin-right: 4px;">Saved:</span>${savedLocation}
-                </div>
-
-                <div style="display:flex;gap:8px;margin-top:4px;">
-
-                    <button 
-                        class="nav-btn delete-btn" 
-                        style="flex:1;padding:8px;font-size:0.85rem;" 
-                        onclick="deleteLog(${log.id})">
-                        🗑 Delete
-                    </button>
-
-                    ${log.faces_path ? `
-                    <button 
-                        class="nav-btn"
-                        style="flex:1;padding:8px;font-size:0.85rem;background:var(--green);"
-                        onclick="promptAddToBaseline('${log.faces_path.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
-                        + Baseline
-                    </button>` : ''}
-
-                </div>
-
-            </div>
-        `;
-
-        grid.appendChild(card);
-    });
-    // Apply remembered selections to the newly drawn cards
-    syncCheckboxes();
-}
-
-async function deleteLog(id) {
-
-    if (!confirm('Delete this record?'))
-        return;
-
-    await fetch(`/delete_log/${id}`, {
-        method: 'POST'
-    });
-
-    loadLogs();
-}
-
-async function deleteSelected() {
-    // Pull the IDs from our memory Set instead of the DOM
-    const ids = Array.from(selectedRecordIds);
-
-    if (!ids.length) {
-        alert('No records selected.');
-        return;
-    }
-
-    if (!confirm(`Delete ${ids.length} records?`))
-        return;
-
-    await fetch('/delete_logs_bulk', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ids })
-    });
-
-    // Clear memory and reload after successful deletion
-    selectedRecordIds.clear();
-    $('#selectAll').prop('checked', false);
-    loadLogs();
-}
-
-function applyFilters() {
-
-    const text     = document.getElementById('searchInput').value.toLowerCase();
-    const person   = document.getElementById('personFilter').value;
-    const explicit = document.getElementById('explicitFilter').value;
-    const gender   = document.getElementById('genderFilter').value;
-    const camera   = document.getElementById('cameraFilter').value;
-    const showBlank = document.getElementById('showBlankRecords').checked;
-
-    const filtered = allLogs.filter(log => {
-
-        // ── Text search ──────────────────────────────
-        if (text && !JSON.stringify(log).toLowerCase().includes(text))
-            return false;
-
-        // ── Normalise values ─────────────────────────
-        const pName    = (log.person_name   || '').trim().toLowerCase();
-        const eParts   = (log.explicit_parts || '').trim().toLowerCase();
-        const hasPerson  = pName  !== '' && pName  !== 'testing' && pName !== 'unknown';
-        const hasExplicit = eParts !== '' && eParts !== 'none';
-
-        // ── Blank-records gate ───────────────────────
-        if (!showBlank && !hasPerson && !hasExplicit) return false;
-
-        // ── Explicit filter (THE CORE FIX) ───────────
-        // "has_explicit"  → only records that genuinely have explicit content
-        // "all_records"   → no filter at all
-        // "no_explicit"   → only records without explicit content
-        // anything else   → treat as a specific category name
-        if (explicit === 'has_explicit') {
-            if (!hasExplicit) return false;
-
-        } else if (explicit === 'no_explicit') {
-            if (hasExplicit) return false;
-
-        } else if (explicit !== 'all_records') {
-            // Specific category match
-            if (!hasExplicit) return false;
-            const partsArray = (log.explicit_parts || '')
-                .split(',').map(p => p.trim().toUpperCase());
-            if (!partsArray.includes(explicit.toUpperCase())) return false;
-        }
-
-        // ── Person filter ────────────────────────────
-        if (person !== 'all') {
-            if (!hasPerson) return false;
-            const personArray = (log.person_name || '')
-                .split(',').map(p => p.trim());
-            if (!personArray.includes(person)) return false;
-        }
-
-        // ── Gender filter ────────────────────────────
-        if (gender !== 'all') {
-            if ((log.gender || '').toLowerCase() !== gender.toLowerCase())
-                return false;
-        }
-
-        // ── Camera filter ────────────────────────────
-        if (camera !== 'all') {
-            if ((log.fromwhere || '').trim() !== camera) return false;
-        }
-
-        return true;
-    });
-
-    table.clear().rows.add(filtered).draw();
-    updateStatsBar(filtered);
-    if (cardMode) buildCards(filtered);
-
-    document.getElementById('recordCount').innerText =
-        `${filtered.length.toLocaleString()} / ${allLogs.length.toLocaleString()} records`;
-}
-
-// --- SELECTION MEMORY & SHIFT-CLICK LOGIC ---
-const selectedRecordIds = new Set();
-let lastChecked = null;
-
-// Helper function to push memory state to the visible UI
-function syncCheckboxes() {
-    $('.record-checkbox').each(function() {
-        const id = String($(this).val());
-        $(this).prop('checked', selectedRecordIds.has(id));
-    });
-}
-
-// 1. Handle Click and Shift-Click
-$(document).on('click', '.record-checkbox', function(e) {
-    // Scope the range calculation only to the view we are currently looking at
-    const $container = $(this).closest('#tableContainer, #cardContainer');
-    const $checkboxes = $container.find('.record-checkbox');
-
-    // Execute Shift-Click logic
-    if (e.shiftKey && lastChecked) {
-        const start = $checkboxes.index(this);
-        const end = $checkboxes.index(lastChecked);
-
-        if (start !== -1 && end !== -1) {
-            const targetState = lastChecked.checked;
-            $checkboxes.slice(Math.min(start, end), Math.max(start, end) + 1).each(function() {
-                $(this).prop('checked', targetState);
-            });
-        }
-    }
-    lastChecked = this;
-
-    // Save the active view's checkbox states into our memory Set
-    $checkboxes.each(function() {
-        const id = String($(this).val());
-        if ($(this).is(':checked')) {
-            selectedRecordIds.add(id);
-        } else {
-            selectedRecordIds.delete(id);
-        }
-    });
-
-    // Mirror the new memory state to the hidden view
-    syncCheckboxes();
-});
-
-// 2. Updated Select All (Memory Aware)
-$(document).on('change', '#selectAll', function() {
-    const isChecked = $(this).is(':checked');
-    const $visibleCheckboxes = $('.record-checkbox:visible');
-    
-    $visibleCheckboxes.each(function() {
-        const id = String($(this).val());
-        if (isChecked) {
-            selectedRecordIds.add(id);
-        } else {
-            selectedRecordIds.delete(id);
-        }
-    });
-
-    syncCheckboxes();
-    lastChecked = null; // Reset shift-click anchor
-});
-
-// 3. Re-apply selections automatically when DataTables changes pages
-$(document).on('draw.dt', '#logsTable', function() {
-    syncCheckboxes();
-});
-
-document.getElementById('searchInput')
-    .addEventListener('input', applyFilters);
-
-document.getElementById('personFilter')
-    .addEventListener('change', applyFilters);
-
-document.getElementById('explicitFilter')
-    .addEventListener('change', applyFilters);
-
-document.getElementById('genderFilter')
-    .addEventListener('change', applyFilters);
-
-document.getElementById('cameraFilter')
-    .addEventListener('change', applyFilters);
-
-document.getElementById('showBlankRecords')
-    .addEventListener('change', applyFilters);
-
-// ── Stats bar ────────────────────────────────────────────────────────
-function updateStatsBar(visibleLogs) {
-    const shown = (visibleLogs || allLogs).length;
-
-    const explicitTotal = allLogs.filter(l => {
-        const p = (l.explicit_parts || '').trim().toLowerCase();
-        return p && p !== 'none';
-    }).length;
-
-    const faceTotal = allLogs.filter(l =>
-        (l.faces_path || '').trim()
-    ).length;
-
-    document.getElementById('statTotal').textContent    = allLogs.length.toLocaleString();
-    document.getElementById('statExplicit').textContent = explicitTotal.toLocaleString();
-    document.getElementById('statFaces').textContent    = faceTotal.toLocaleString();
-    document.getElementById('statShowing').textContent  = shown.toLocaleString();
-}
-
-// ── Reset all filters to sensible defaults ───────────────────────────
-function resetFilters() {
-    document.getElementById('searchInput').value       = '';
-    document.getElementById('explicitFilter').value    = 'has_explicit';
-    document.getElementById('personFilter').value      = 'all';
-    document.getElementById('genderFilter').value      = 'all';
-    document.getElementById('cameraFilter').value      = 'all';
-    document.getElementById('showBlankRecords').checked = false;
-    applyFilters();
-}
-
-// ── Export visible rows to CSV ───────────────────────────────────────
-function exportCSV() {
-    const rows = table.rows({ search: 'applied', order: 'applied' }).data().toArray();
-
-    if (!rows.length) {
-        alert('No records to export (check your filters).');
-        return;
-    }
-
-    const escape = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-
-    const headers = ['ID','Camera','Source File','Person','Gender','Age','Explicit Parts','Confidence (%)'];
-    const lines   = [
-        headers.join(','),
-        ...rows.map(r => [
-            r.id,
-            escape(r.fromwhere),
-            escape(r.source_file),
-            escape(r.person_name),
-            escape(r.gender),
-            r.age || '',
-            escape(r.explicit_parts),
-            parseFloat(r.confidence || 0).toFixed(2)
-        ].join(','))
-    ];
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), {
-        href:     url,
-        download: `surveillance_${new Date().toISOString().slice(0, 10)}.csv`
-    });
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-// ── Auto-refresh (polls /api/all_logs every 30 s) ────────────────────
-function toggleAutoRefresh() {
-    const on  = document.getElementById('autoRefresh').checked;
-    const dot = document.getElementById('statusDot');
-    if (on) {
-        _refreshTimer = setInterval(loadLogs, 30_000);
-        dot.classList.add('live');
+/* ─────────────────────────────────────────────────────────────────────
+   Overview — stats
+   ───────────────────────────────────────────────────────────────────── */
+async function loadStats() {
+  try {
+    // FIX: /api/stats now returns data computed by SQL aggregation in
+    // database.get_stats(), not a Python Counter over all rows.
+    // The JSON shape is identical so no template changes were needed —
+    // but the endpoint is now fast even on million-row databases.
+    const d = await fetch('/api/stats').then(r => r.json());
+    if (d.status !== 'success') throw new Error(d.message);
+
+    document.getElementById('stat-total').textContent    = d.total.toLocaleString();
+    document.getElementById('stat-explicit').textContent = d.explicit.toLocaleString();
+    document.getElementById('stat-faces').textContent    = d.faces.toLocaleString();
+
+    // Person breakdown pills
+    const pc = document.getElementById('person-chart');
+    pc.innerHTML = '';
+    const persons = Object.entries(d.by_person || {}).sort((a,b) => b[1]-a[1]);
+    if (persons.length === 0) {
+      pc.innerHTML = '<span style="color:var(--muted);font-size:13px">No named persons on record.</span>';
     } else {
-        clearInterval(_refreshTimer);
-        _refreshTimer = null;
-        dot.classList.remove('live');
-    }
-}
-
-document.getElementById('autoRefresh').addEventListener('change', toggleAutoRefresh);
-
-// ── Add to Baseline prompt ───────────────────────────────────────────
-async function promptAddToBaseline(path) {
-    const name = prompt('Enter the person\'s name for the training baseline folder:');
-    if (!name || !name.trim()) return;
-
-    try {
-        const res  = await fetch('/add_to_baseline', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ path, new_name: name.trim() })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-            alert(`✓ Added as "${name.trim()}". Face cache will rebuild on the next scan.`);
-        } else {
-            alert('Error: ' + (data.message || 'Could not add to baseline.'));
-        }
-    } catch (e) {
-        alert('Network error while adding to baseline.');
-        console.error(e);
-    }
-}
-
-loadLogs();
-// --- EVENT MANAGER LOGIC ---
-function openEventModal() {
-    document.getElementById('eventModal').style.display = 'flex';
-    fetchEventsConfig();
-}
-
-function closeEventModal(event) {
-    if (event && event.target.id !== 'eventModal' && event.target.className !== 'close-btn') return;
-    document.getElementById('eventModal').style.display = 'none';
-}
-
-async function fetchEventsConfig() {
-    try {
-const res = await fetch('/api/events');
-const data = await res.json();
-currentEventsConfig = data;
-if (!currentEventsConfig.events) currentEventsConfig.events = [];
-renderEventsForm();
-    } catch (e) {
-console.error("Failed to load events config", e);
-currentEventsConfig = { events: [] };
-renderEventsForm();
-    }
-}
-
-function renderEventsForm() {
-    const container = document.getElementById('events-container');
-    container.innerHTML = '';
-    if (currentEventsConfig.events.length === 0) {
-container.innerHTML = '<p style="color: var(--text-muted); text-align: center;">No events configured. Click "Add New Event" to start.</p>';
-return;
+      persons.forEach(([name, cnt]) => {
+        pc.insertAdjacentHTML('beforeend',
+          `<div style="background:var(--surface);border:1px solid var(--border);
+                       border-radius:20px;padding:6px 14px;font-size:13px;">
+             <b style="color:var(--accent)">${esc(name)}</b>
+             <span style="color:var(--muted);margin-left:6px">${cnt}</span>
+           </div>`);
+      });
     }
 
-    currentEventsConfig.events.forEach((event, index) => {
-// Ensure the current trigger is always an option, even if not in systemBaselines
-let currentTriggerVal = event.trigger || "unknown";
-let triggerOptions = `
-    <option value="nudity" ${currentTriggerVal === 'nudity' ? 'selected' : ''}>Explicit (Nudity)</option>
-    <option value="anyone" ${currentTriggerVal === 'anyone' ? 'selected' : ''}>Anyone (Any Detected Face)</option>
-    <option value="unknown" ${currentTriggerVal === 'unknown' ? 'selected' : ''}>Unknown Person</option>
-`;
-
-// Track faces we've already added to avoid duplicates
-let addedFaces = new Set(['nudity', 'anyone', 'unknown']);
-
-// If the current trigger is a specific face not in the standard list, add it first
-if (!addedFaces.has(currentTriggerVal)) {
-     triggerOptions += `<option value="${currentTriggerVal}" selected>Face: ${currentTriggerVal} (Saved)</option>`;
-     addedFaces.add(currentTriggerVal);
+    // Category breakdown
+    const cc = document.getElementById('category-chart');
+    cc.innerHTML = '';
+    const cats = Object.entries(d.by_category || {}).sort((a,b) => b[1]-a[1]);
+    if (cats.length === 0) {
+      cc.innerHTML = '<span style="color:var(--muted);font-size:13px">No explicit content recorded.</span>';
+    } else {
+      cats.forEach(([cat, cnt]) => {
+        cc.insertAdjacentHTML('beforeend',
+          `<div style="background:rgba(229,83,83,.1);border:1px solid rgba(229,83,83,.3);
+                       border-radius:20px;padding:6px 14px;font-size:13px;">
+             <b style="color:var(--danger)">${esc(cat)}</b>
+             <span style="color:var(--muted);margin-left:6px">${cnt}</span>
+           </div>`);
+      });
+    }
+  } catch (e) {
+    toast('Stats load failed: ' + e.message, false);
+  }
 }
 
-// Add remaining faces from the database dynamically using the dashboard's loaded records
-const systemBaselines = [...new Set(allLogs.map(log => log.person_name).filter(name => name && name !== 'Unknown'))];
-systemBaselines.forEach(person => {
-    const val = person.toLowerCase();
-    if (!addedFaces.has(val)) {
-triggerOptions += `<option value="${val}">Face: ${person}</option>`;
-addedFaces.add(val);
+/* ─────────────────────────────────────────────────────────────────────
+   Gallery
+   ───────────────────────────────────────────────────────────────────── */
+let allLogs = INITIAL_LOGS;   // seeded by Jinja2, refreshed on demand
+let selectedIds = new Set();
+
+function buildGallery(logs) {
+  const grid = document.getElementById('gallery-grid');
+  const empty = document.getElementById('gallery-empty');
+  grid.innerHTML = '';
+
+  if (!logs.length) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  logs.forEach(log => {
+    const thumb = log.faces_path || log.nudity_path || '';
+    const isExplicit = log.is_explicit || (log.explicit_parts && log.explicit_parts.toLowerCase() !== 'none');
+    const hasFace = !!log.faces_path;
+
+    // Build the card using DOM methods (not innerHTML with raw log data)
+    // to guarantee XSS safety for all user-controlled fields.
+    const card = document.createElement('div');
+    card.className = 'gallery-card';
+    card.dataset.id = log.id;
+
+    // Thumbnail
+    if (thumb) {
+      const img = document.createElement('img');
+      img.className = 'gallery-thumb';
+      img.alt = 'Detection thumbnail';
+      img.loading = 'lazy';
+      img.src = '/serve_media?path=' + encodeURIComponent(thumb);
+      img.onclick = () => openLightbox(img.src);
+      img.onerror = () => { img.style.display='none'; };
+      card.appendChild(img);
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'gallery-thumb missing';
+      ph.textContent = '📷';
+      card.appendChild(ph);
     }
-});
 
-const div = document.createElement('div');
-div.style.background = '#0b1120';
-div.style.padding = '15px';
-div.style.marginBottom = '15px';
-div.style.borderRadius = '8px';
-div.style.border = '1px solid var(--border-color)';
+    // Meta
+    const meta = document.createElement('div');
+    meta.className = 'gallery-meta';
 
-div.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-<h3 style="margin:0; color: var(--accent-blue); text-transform: uppercase;">${event.id}</h3>
-<div style="display: flex; gap: 10px; align-items: center;">
-    <label class="checkbox-label" style="font-weight: bold; color: ${event.enabled ? '#22c55e' : 'var(--text-muted)'}; margin-right: 10px;">
-<input type="checkbox" ${event.enabled ? 'checked' : ''} onchange="updateEvent(${index}, 'enabled', this.checked)"> ENABLED
-    </label>
-    <button class="nav-btn" style="padding: 4px 8px; font-size: 0.8rem; background: var(--card-bg); border: 1px solid var(--text-muted);" onclick="duplicateEvent(${index})">Copy</button>
-    <button class="nav-btn delete-btn" style="padding: 4px 8px; font-size: 0.8rem;" onclick="deleteEvent(${index})">Delete</button>
-</div>
-    </div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-<div>
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Type</span></label>
-    <select onchange="updateEvent(${index}, 'type', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: #334155; color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-<option value="tts" ${event.type === 'tts' ? 'selected' : ''}>Text-to-Speech (TTS)</option>
-<option value="command" ${event.type === 'command' ? 'selected' : ''}>System Command</option>
-<option value="light" ${event.type === 'light' ? 'selected' : ''}>Light Control (Smart Home)</option>
-    </select>
-</div>
-<div>
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Trigger When Detected</span></label>
-    <select onchange="updateEvent(${index}, 'trigger', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: #334155; color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-${triggerOptions}
-    </select>
-</div>
+    const name = document.createElement('div');
+    name.className = 'gallery-name';
+    name.textContent = log.person_name || 'Unknown';
+    meta.appendChild(name);
 
-<div>
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Device Trigger (Camera ID)</span></label>
-    <input type="text" value="${event.device_trigger_from || ''}" onchange="updateEvent(${index}, 'device_trigger_from', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="Blank for all devices">
-</div>
+    const sub = document.createElement('div');
+    sub.className = 'gallery-sub';
+    sub.textContent = log.timestamp || '';
+    meta.appendChild(sub);
 
-<div>
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">From Where</span></label>
-    <input type="text" value="${event.fromwhere || ''}" onchange="updateEvent(${index}, 'fromwhere', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="e.g. Front Camera">
-</div>
+    const tags = document.createElement('div');
+    tags.className = 'gallery-tags';
+    if (hasFace) {
+      const t = document.createElement('span');
+      t.className = 'tag tag-face';
+      t.textContent = 'Face';
+      tags.appendChild(t);
+    }
+    if (isExplicit) {
+      const t = document.createElement('span');
+      t.className = 'tag tag-nudity';
+      t.textContent = log.explicit_parts || 'Explicit';
+      tags.appendChild(t);
+    }
+    meta.appendChild(tags);
+    card.appendChild(meta);
 
-<div style="grid-column: span 2;">
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Action Payload</span></label>
-    <input type="text" value="${event.action || ''}" onchange="updateEvent(${index}, 'action', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="${event.type === 'tts' ? 'Text to speak...' : 'Command or light name...'}">
-</div>
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'gallery-actions';
 
-<div style="display: ${event.type === 'tts' ? 'block' : 'none'};">
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">TTS Voice</span></label>
-    <select onchange="updateEvent(${index}, 'voice', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-<option value="af_heart" ${event.voice === 'af_heart' ? 'selected' : ''}>Female (Default)</option>
-<option value="am_echo" ${event.voice === 'am_echo' ? 'selected' : ''}>Male</option>
-<option value="af_nicole" ${event.voice === 'af_nicole' ? 'selected' : ''}>Nicole (Female)</option>
-<option value="ef_dora" ${event.voice === 'ef_dora' ? 'selected' : ''}>Dora (Spanish Female)</option>
-<option value="bf_emma" ${event.voice === 'bf_emma' ? 'selected' : ''}>Emma (British Female)</option>
-<option value="am_onyx" ${event.voice === 'am_onyx' ? 'selected' : ''}>Onyx (Male)</option>
-    </select>
-</div>
-<div style="display: ${event.type === 'tts' ? 'flex' : 'none'}; gap: 10px; align-items: flex-end;">
-    <div style="flex: 1;">
-<label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">TTS Speed</span></label>
-<input type="number" step="0.1" min="0.5" max="2.0" value="${event.speed || 1.0}" onchange="updateEvent(${index}, 'speed', parseFloat(this.value))" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-    </div>
-    <button class="nav-btn" style="padding: 6px; font-size: 0.8rem; height: 32px;" onclick="testVoice(${index})">🔊 Test Voice</button>
-</div>
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-xs btn-delete';
+    delBtn.textContent = 'Delete';
+    delBtn.onclick = () => deleteLog(log.id, card);
+    actions.appendChild(delBtn);
 
-<div>
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Cooldown (Seconds)</span></label>
-    <input type="number" value="${event.cooldown || 60}" onchange="updateEvent(${index}, 'cooldown', parseInt(this.value) || 0)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-</div>
+    if (thumb) {
+      const blBtn = document.createElement('button');
+      blBtn.className = 'btn-xs btn-baseline';
+      blBtn.textContent = '+ Baseline';
+      blBtn.onclick = () => openBaseline(thumb);
+      actions.appendChild(blBtn);
+    }
+    card.appendChild(actions);
 
-<div>
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Schedule Start</span></label>
-    <input type="time" value="${event.schedule?.start || '00:00'}" onchange="updateEventSchedule(${index}, 'start', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-</div>
-<div>
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Schedule End</span></label>
-    <input type="time" value="${event.schedule?.end || '23:59'}" onchange="updateEventSchedule(${index}, 'end', this.value)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-</div>
+    grid.appendChild(card);
+  });
 
-<div style="display: ${event.type === 'light' ? 'block' : 'none'};">
-    <label class="form-group"><span style="font-size:0.8rem; color:var(--text-muted);">Timeout (Light Only)</span></label>
-    <input type="number" value="${event.timeout || ''}" onchange="updateEvent(${index}, 'timeout', parseInt(this.value) || null)" style="width:100%; box-sizing: border-box; padding: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="e.g. 60 (seconds)">
-</div>
-    </div>
-`;
-container.appendChild(div);
+  updateBulkBtn();
+}
+
+function filterGallery(q) {
+  const lq = q.toLowerCase();
+  const filtered = allLogs.filter(l =>
+    (l.person_name || '').toLowerCase().includes(lq) ||
+    (l.source_file || '').toLowerCase().includes(lq)
+  );
+  buildGallery(filtered);
+}
+
+async function deleteLog(id, card) {
+  if (!confirm('Delete this log entry?')) return;
+  const d = await api('/delete_log/' + id, {});
+  if (d.status === 'success') {
+    card.remove();
+    allLogs = allLogs.filter(l => l.id !== id);
+    toast('Deleted.');
+  } else {
+    toast('Delete failed.', false);
+  }
+}
+
+async function bulkDelete() {
+  if (!selectedIds.size) return;
+  if (!confirm(`Delete ${selectedIds.size} selected entries?`)) return;
+  const d = await api('/delete_logs_bulk', { ids: [...selectedIds] });
+  if (d.status === 'success') {
+    selectedIds.forEach(id => {
+      const el = document.querySelector(`.gallery-card[data-id="${id}"]`);
+      if (el) el.remove();
     });
+    allLogs = allLogs.filter(l => !selectedIds.has(l.id));
+    selectedIds.clear();
+    updateBulkBtn();
+    toast('Bulk delete complete.');
+  } else {
+    toast('Bulk delete failed.', false);
+  }
 }
 
-function updateEvent(index, field, value) {
-    currentEventsConfig.events[index][field] = value;
-    if (field === 'type') renderEventsForm();
+function updateBulkBtn() {
+  document.getElementById('bulk-delete-btn').style.display =
+    selectedIds.size ? 'block' : 'none';
 }
 
-function updateEventSchedule(index, field, value) {
-    if (!currentEventsConfig.events[index].schedule) {
-currentEventsConfig.events[index].schedule = { start: "00:00", end: "23:59" };
-    }
-    currentEventsConfig.events[index].schedule[field] = value;
+/* ─────────────────────────────────────────────────────────────────────
+   Lightbox
+   ───────────────────────────────────────────────────────────────────── */
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox(e) {
+  if (!e || e.target === document.getElementById('lightbox') ||
+      e.currentTarget === document.getElementById('lightbox-close')) {
+    document.getElementById('lightbox').classList.remove('open');
+  }
 }
 
-function deleteEvent(index) {
-    if (confirm("Delete this event?")) {
-currentEventsConfig.events.splice(index, 1);
-renderEventsForm();
-    }
+/* ─────────────────────────────────────────────────────────────────────
+   Baseline modal
+   ───────────────────────────────────────────────────────────────────── */
+let _baselinePath = '';
+function openBaseline(path) {
+  _baselinePath = path;
+  document.getElementById('baseline-name').value = '';
+  document.getElementById('baseline-modal').classList.add('open');
+  setTimeout(() => document.getElementById('baseline-name').focus(), 50);
+}
+function closeBaseline(e) {
+  if (!e || e.target === document.getElementById('baseline-modal'))
+    document.getElementById('baseline-modal').classList.remove('open');
+}
+async function submitBaseline() {
+  const name = document.getElementById('baseline-name').value.trim();
+  if (!name) { toast('Enter a person name.', false); return; }
+  // FIX: server now validates the path is inside an allowed media directory
+  // (is_allowed_media_path check added to /add_to_baseline in web_server.py).
+  const d = await api('/add_to_baseline', { path: _baselinePath, new_name: name });
+  if (d.status === 'success') {
+    toast('Added to baseline. Face cache will be rebuilt on next scan.');
+    closeBaseline();
+  } else {
+    toast(d.message || 'Failed to add to baseline.', false);
+  }
 }
 
-function addNewEvent() {
-    const newId = prompt("Enter a unique ID for this event (no spaces, e.g., 'front_door_alert'):");
-    if (!newId || newId.trim() === "") return;
-    if (!currentEventsConfig.events) currentEventsConfig.events = [];
-    
-    if (currentEventsConfig.events.some(e => e.id === newId.trim())) {
-alert("An event with that ID already exists.");
-return;
-    }
-    
-    currentEventsConfig.events.push({
-id: newId.trim(),
-type: "tts",
-trigger: "unknown",
-action: "",
-device_trigger_from: "",
-fromwhere: "",
-enabled: true,
-cooldown: 60,
-schedule: { start: "00:00", end: "23:59" }
-    });
-    renderEventsForm();
-    
-    const container = document.getElementById('events-container');
-    container.parentElement.scrollTop = container.parentElement.scrollHeight;
+/* ─────────────────────────────────────────────────────────────────────
+   Events
+   ───────────────────────────────────────────────────────────────────── */
+let _eventsData = { settings: {}, events: [] };
+
+async function loadEvents() {
+  try {
+    // FIX: /api/events previously used a relative path (events.json) in
+    // web_server.py which broke when the app wasn't started from its own
+    // directory.  Now uses an absolute path — this fetch just works.
+    const d = await fetch('/api/events').then(r => r.json());
+    _eventsData = d;
+    renderEvents(d);
+  } catch (e) {
+    toast('Could not load events.', false);
+  }
 }
 
-function duplicateEvent(index) {
-    const sourceEvent = currentEventsConfig.events[index];
-    const newId = prompt(`Enter a unique ID for the duplicated event (copying from '${sourceEvent.id}'):`, `${sourceEvent.id}_copy`);
-    if (!newId || newId.trim() === "") return;
-    
-    if (currentEventsConfig.events.some(e => e.id === newId.trim())) {
-alert("An event with that ID already exists.");
-return;
-    }
-    
-    const clonedEvent = JSON.parse(JSON.stringify(sourceEvent));
-    clonedEvent.id = newId.trim();
-    currentEventsConfig.events.push(clonedEvent);
-    renderEventsForm();
+function renderEvents(d) {
+  const s = d.settings || {};
+  document.getElementById('ev-speaker').value   = s.speaker_ip      || '';
+  document.getElementById('ev-cube-url').value  = s.cubescript_url  || '';
+  document.getElementById('ev-cube-ip').value   = s.cube_ip         || '';
+
+  const list = document.getElementById('event-list');
+  list.innerHTML = '';
+
+  (d.events || []).forEach((ev, i) => {
+    const card = document.createElement('div');
+    card.className = 'event-card' + (ev.enabled ? '' : ' disabled');
+
+    const badge = ev.type === 'tts' ? 'badge-tts' : 'badge-light';
+    const badgeTxt = ev.type === 'tts' ? 'TTS' : 'Light';
+
+    card.innerHTML = `
+      <div class="event-body">
+        <div class="event-header">
+          <span class="event-id">${esc(ev.id)}</span>
+          <span class="event-badge ${badge}">${badgeTxt}</span>
+          <span style="font-size:12px;color:var(--muted)">trigger: <b>${esc(ev.trigger)}</b></span>
+          ${ev.fromwhere ? `<span style="font-size:11px;color:var(--muted)">from: ${esc(ev.fromwhere)}</span>` : ''}
+        </div>
+        <div class="event-detail">
+          Action: <b>${esc(ev.action)}</b> &nbsp;·&nbsp;
+          Cooldown: ${ev.cooldown}s &nbsp;·&nbsp;
+          Schedule: ${esc(ev.schedule?.start || '00:00')} – ${esc(ev.schedule?.end || '23:59')}
+        </div>
+      </div>
+      <div class="event-toggle">
+        <input type="checkbox" class="toggle" data-idx="${i}"
+          ${ev.enabled ? 'checked' : ''} onchange="toggleEvent(${i}, this.checked)">
+        <button class="btn-xs btn-delete" style="width:auto;padding:5px 10px"
+          onclick="removeEvent(${i})">✕</button>
+      </div>`;
+
+    list.appendChild(card);
+  });
+}
+
+function toggleEvent(idx, enabled) {
+  _eventsData.events[idx].enabled = enabled;
+  const cards = document.querySelectorAll('.event-card');
+  cards[idx].classList.toggle('disabled', !enabled);
+}
+
+function removeEvent(idx) {
+  if (!confirm('Remove this event rule?')) return;
+  _eventsData.events.splice(idx, 1);
+  renderEvents(_eventsData);
+}
+
+function addEvent() {
+  _eventsData.events.push({
+    id: 'new_event_' + Date.now(),
+    type: 'tts',
+    trigger: 'anyone',
+    action: 'Detection alert.',
+    enabled: false,
+    cooldown: 60,
+    schedule: { start: '00:00', end: '23:59' },
+  });
+  renderEvents(_eventsData);
+  toast('New event added — edit events.json directly for full configuration.');
 }
 
 async function saveEvents() {
-    try {
-const res = await fetch('/api/events', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(currentEventsConfig)
-});
-if (res.ok) {
-    alert("Event configuration saved successfully!");
-    closeEventModal();
-} else alert("Failed to save event configuration.");
-    } catch (e) {
-console.error(e);
-alert("Network error while saving.");
-    }
+  // Collect settings from form
+  const token = document.getElementById('ev-cube-token').value.trim();
+  _eventsData.settings = {
+    speaker_ip:     document.getElementById('ev-speaker').value.trim(),
+    cubescript_url: document.getElementById('ev-cube-url').value.trim(),
+    cube_ip:        document.getElementById('ev-cube-ip').value.trim(),
+    cube_token:     token || _eventsData.settings?.cube_token || '',
+  };
+
+  const d = await api('/api/events', _eventsData);
+  if (d.status === 'success') toast('Events saved.');
+  else toast(d.message || 'Save failed.', false);
 }
 
-async function testVoice(index) {
-    const event = currentEventsConfig.events[index];
-    const text = event.action || "This is a test of the selected voice system.";
-    const voice = event.voice || "af_heart";
-    const speed = parseFloat(event.speed) || 1.0;
-
-    try {
-const res = await fetch('/api/test_voice', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: text, voice: voice, speed: speed })
-});
-if (!res.ok) alert("Failed to trigger voice test. Check server logs.");
-    } catch (e) {
-console.error(e);
-alert("Network error while trying to test voice.");
-    }
+async function testVoice() {
+  const d = await api('/api/test_voice', {
+    text: 'This is a voice test from ImageCheck.',
+    voice: 'af_heart',
+    speed: 1.0,
+  });
+  if (d.status === 'success') toast('Voice test sent.');
+  else toast(d.message || 'Voice test failed.', false);
 }
 
-
-// --- SECURITY MODAL LOGIC ---
-async function openSecurityModal() {
-    try {
-        // Fetch the current settings from your existing combined route
-        const res = await fetch('/api/security');
-        
-        if (res.ok) {
-            const data = await res.json();
-            
-            // Populate the input fields based on the JSON your route returns
-            document.getElementById('secDashUser').value = data.dash_user || '';
-            document.getElementById('secCamUser').value = data.cam_user || '';
-            document.getElementById('secCamIP').value = data.cam_ip || '';
-            
-            // Passwords remain blank for security (as designed in your Python route)
-            document.getElementById('secDashPass').value = '';
-            document.getElementById('secCamPass').value = '';
-        } else {
-            console.warn("Could not load existing security config.");
-        }
-    } catch (e) {
-        console.error("Network error while loading security config:", e);
-    }
-
-    // Show the modal
-    document.getElementById('securityModal').style.display = 'flex';
-}
-
-function closeSecurityModal(event) {
-    if (event && event.target.id !== 'securityModal' && event.target.className !== 'close-btn') return;
-    document.getElementById('securityModal').style.display = 'none';
-}
-
-async function saveSecurityConfig() {
-    const payload = {
-dash_user: document.getElementById('secDashUser').value,
-dash_pass: document.getElementById('secDashPass').value,
-cam_user: document.getElementById('secCamUser').value,
-cam_pass: document.getElementById('secCamPass').value,
-cam_ip: document.getElementById('secCamIP').value
-    };
-    try {
-const res = await fetch('/api/security', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-});
-const data = await res.json();
-if (res.ok) {
-    alert("Security configuration saved successfully. The system will now reload.");
-    window.location.reload();
-} else alert("Failed to save security config: " + data.message);
-    } catch (e) {
-console.error(e);
-alert("Network error. Check server logs.");
-    }
-}
-
-// ── Config Editor Modal ──────────────────────────────────────────────
-
-async function openConfigModal() {
-    document.getElementById('configModal').style.display = 'flex';
-    switchConfigTab('ini');
-    loadConfigFile();
-    loadCredentials();
-}
-
-function closeConfigModal(event) {
-    if (event && event.target.id !== 'configModal' && event.target.className !== 'close-btn') return;
-    document.getElementById('configModal').style.display = 'none';
-}
-
-function switchConfigTab(tab) {
-    ['ini', 'creds'].forEach(t => {
-        document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === tab);
-        document.getElementById(`config-tab-${t}`).style.display = (t === tab) ? 'block' : 'none';
-    });
-}
-
-// ── config.ini ───────────────────────────────────────────────────────
-
-async function loadConfigFile() {
-    const ta     = document.getElementById('configIniContent');
-    const msgEl  = document.getElementById('iniSaveMsg');
-    ta.value     = 'Loading…';
-    msgEl.textContent = '';
-
-    try {
-        const res  = await fetch('/api/config_file');
-        const data = await res.json();
-        if (data.status === 'success') {
-            ta.value = data.content;
-        } else {
-            ta.value = '';
-            msgEl.textContent = '✗ ' + (data.message || 'Could not load file');
-            msgEl.className   = 'save-msg err';
-        }
-    } catch (e) {
-        ta.value = '';
-        msgEl.textContent = '✗ Network error loading config.ini';
-        msgEl.className   = 'save-msg err';
-        console.error(e);
-    }
-}
-
-async function saveConfigFile() {
-    const content = document.getElementById('configIniContent').value;
-    const msgEl   = document.getElementById('iniSaveMsg');
-    msgEl.textContent = 'Saving…';
-    msgEl.className   = 'save-msg';
-
-    try {
-        const res  = await fetch('/api/config_file', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ content })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            msgEl.textContent = '✓ Saved — restart to apply changes';
-            msgEl.className   = 'save-msg';
-        } else {
-            msgEl.textContent = '✗ ' + (data.message || 'Save failed');
-            msgEl.className   = 'save-msg err';
-        }
-    } catch (e) {
-        msgEl.textContent = '✗ Network error';
-        msgEl.className   = 'save-msg err';
-        console.error(e);
-    }
-}
-
-// ── Credentials (login.env) ──────────────────────────────────────────
-
-function _setBadge(id, isSet) {
-    const el    = document.getElementById(id);
-    el.innerHTML = isSet ? '<span class="set-badge">set</span>' : '';
-}
-
+/* ─────────────────────────────────────────────────────────────────────
+   Security
+   ───────────────────────────────────────────────────────────────────── */
 async function loadCredentials() {
-    try {
-        const res  = await fetch('/api/credentials');
-        const data = await res.json();
-        if (!res.ok) return;
-
-        // Populate non-sensitive (visible) fields
-        document.getElementById('cred_dash_user').value = data.dash_user  || '';
-        document.getElementById('cred_cam_ip').value    = data.cam_ip     || '';
-        document.getElementById('cred_cam_user').value  = data.cam_user   || '';
-
-        // Clear all password / token inputs (write-only — never pre-filled)
-        ['cred_dash_pass', 'cred_cam_pass', 'cred_sighthound_pass', 'cred_cube_token']
-            .forEach(id => { document.getElementById(id).value = ''; });
-
-        // Show "set" badge when a credential is already stored
-        _setBadge('badge_dash_pass',   data.dash_pass_set);
-        _setBadge('badge_cam_pass',    data.cam_pass_set);
-        _setBadge('badge_sighthound',  data.sighthound_pass_set);
-        _setBadge('badge_cube',        data.cube_token_set);
-
-    } catch (e) { console.error('Error loading credentials:', e); }
+  try {
+    const d = await fetch('/api/credentials').then(r => r.json());
+    document.getElementById('sec-user').value    = d.dash_user || '';
+    document.getElementById('sec-cam-ip').value  = d.cam_ip    || '';
+    document.getElementById('sec-cam-user').value = d.cam_user || '';
+    // Show set-indicators for fields that have a stored secret
+    ['sec-pass', 'sec-cam-pass', 'sec-sh-pass'].forEach(id => {
+      const inp = document.getElementById(id);
+      const key = id === 'sec-pass' ? 'dash_pass_set'
+                : id === 'sec-cam-pass' ? 'cam_pass_set'
+                : 'sighthound_pass_set';
+      let hint = inp.parentElement.querySelector('.set-indicator');
+      if (!hint) {
+        hint = document.createElement('span');
+        hint.className = 'set-indicator';
+        inp.parentElement.appendChild(hint);
+      }
+      hint.textContent = d[key] ? '✓ set' : '';
+    });
+  } catch (e) {
+    toast('Could not load credentials.', false);
+  }
 }
 
-async function saveCredentials() {
-    const msgEl = document.getElementById('credSaveMsg');
-    msgEl.textContent = 'Saving…';
-    msgEl.className   = 'save-msg';
+async function saveSecurity() {
+  const payload = {
+    dash_user:       document.getElementById('sec-user').value.trim()     || undefined,
+    dash_pass:       document.getElementById('sec-pass').value            || undefined,
+    cam_ip:          document.getElementById('sec-cam-ip').value.trim()   || undefined,
+    cam_user:        document.getElementById('sec-cam-user').value.trim() || undefined,
+    cam_pass:        document.getElementById('sec-cam-pass').value        || undefined,
+    sighthound_pass: document.getElementById('sec-sh-pass').value         || undefined,
+  };
+  // Strip undefined so the server ignores blank fields
+  Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
 
-    const payload = {
-        dash_user:       document.getElementById('cred_dash_user').value.trim(),
-        dash_pass:       document.getElementById('cred_dash_pass').value,
-        cam_ip:          document.getElementById('cred_cam_ip').value.trim(),
-        cam_user:        document.getElementById('cred_cam_user').value.trim(),
-        cam_pass:        document.getElementById('cred_cam_pass').value,
-        sighthound_pass: document.getElementById('cred_sighthound_pass').value,
-        cube_token:      document.getElementById('cred_cube_token').value,
-    };
-
-    try {
-        const res  = await fetch('/api/credentials', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (res.ok) {
-            msgEl.textContent = '✓ Saved — restart required for some changes';
-            msgEl.className   = 'save-msg';
-            loadCredentials();   // refresh badges
-        } else {
-            msgEl.textContent = '✗ ' + (data.error || data.message || 'Save failed');
-            msgEl.className   = 'save-msg err';
-        }
-    } catch (e) {
-        msgEl.textContent = '✗ Network error';
-        msgEl.className   = 'save-msg err';
-        console.error(e);
-    }
+  const d = await api('/api/credentials', payload);
+  if (d.status === 'success') {
+    toast('Saved. ' + (d.message || ''));
+    // Clear password fields after save so they don't linger
+    ['sec-pass','sec-cam-pass','sec-sh-pass'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    loadCredentials();
+  } else {
+    toast(d.error || 'Save failed.', false);
+  }
 }
 
-// --- ESCAPE KEY TO CLOSE MODALS ---
-$(document).on('keydown', function(event) {
-    if (event.key === "Escape") {
-        // Find any visible element with the class 'modal' and hide it
-        $('.modal').hide(); 
-        
-        // If your modals use a dark background overlay, hide that too:
-        // $('.modal-overlay').hide(); 
-    }
+/* ─────────────────────────────────────────────────────────────────────
+   Config editor
+   ───────────────────────────────────────────────────────────────────── */
+async function loadConfig() {
+  try {
+    const d = await fetch('/api/config_file').then(r => r.json());
+    document.getElementById('config-editor').value = d.content || '';
+  } catch (e) {
+    toast('Could not load config.ini.', false);
+  }
+}
+
+async function saveConfig() {
+  const content = document.getElementById('config-editor').value;
+  const d = await api('/api/config_file', { content });
+  if (d.status === 'success') toast(d.message || 'Saved.');
+  else toast(d.message || 'Save failed.', false);
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Init
+   ───────────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  startClock();
+  buildGallery(allLogs);
+  loadStats();
 });
-
 </script>
-
 </body>
 </html>
