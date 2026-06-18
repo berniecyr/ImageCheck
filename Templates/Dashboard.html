@@ -141,6 +141,7 @@
     .btn-danger  { background: var(--danger);  color: #fff; }
     .btn-ghost   { background: var(--surface); color: var(--text);
                    border: 1px solid var(--border); }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
     .event-list { display: flex; flex-direction: column; gap: 12px; }
     .event-card {
       background: var(--surface); border: 1px solid var(--border);
@@ -157,8 +158,15 @@
     .badge-tts   { background: rgba(72,187,120,.18); color: var(--success); }
     .badge-light { background: rgba(237,137,54,.18);  color: var(--warn); }
     .event-detail { font-size: 12px; color: var(--muted); }
-    .event-toggle { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .event-toggle { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     input[type="checkbox"].toggle { width: 36px; height: 20px; cursor: pointer; }
+
+    /* ── Cube connection status dot ─────────────────────────────── */
+    #cube-status-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      display: inline-block; background: var(--muted);
+      transition: background .3s;
+    }
 
     /* ── Forms / settings ───────────────────────────────────────── */
     .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -176,11 +184,40 @@
       border: 1px solid var(--border); background: var(--bg);
       color: var(--text); font-size: 13px; outline: none; transition: border .15s;
     }
-    .field input:focus, .field textarea:focus { border-color: var(--accent); }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      border-color: var(--accent);
+    }
     .field textarea { min-height: 100px; resize: vertical; font-family: monospace; }
     .field-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
     .set-indicator { font-size: 11px; color: var(--success); font-weight: 600;
                      margin-left: 6px; }
+
+    /* ── Schedule time picker ───────────────────────────────────── */
+    .sched-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .sched-row select, .sched-row input {
+      padding: 7px 10px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); font-size: 12px; outline: none;
+    }
+    .sched-row select:focus, .sched-row input:focus { border-color: var(--accent); }
+    .sched-row .sched-type  { flex-shrink: 0; }
+    .sched-row .sched-time  { width: 118px; }
+    .sched-row .sched-offset { width: 72px; }
+    .sched-sun { display: flex; gap: 4px; align-items: center; }
+
+    /* ── Event edit modal ───────────────────────────────────────── */
+    #event-modal {
+      display: none; position: fixed; inset: 0; z-index: 960;
+      background: rgba(0,0,0,.78); align-items: flex-start;
+      justify-content: center; overflow-y: auto; padding: 32px 16px;
+    }
+    #event-modal.open { display: flex; }
+    .modal-box-lg {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 28px;
+      width: 560px; max-width: 96vw; box-shadow: var(--shadow);
+    }
+    .modal-box-lg h3 { margin-bottom: 20px; font-size: 15px; }
 
     /* ── Feedback toast ─────────────────────────────────────────── */
     #toast {
@@ -329,27 +366,62 @@
           <button class="btn btn-ghost"   onclick="addEvent()">＋ Add event</button>
           <button class="btn btn-ghost"   onclick="testVoice()">🔊 Test voice</button>
         </div>
-        <div class="field-group" style="margin-bottom:20px;">
-          <h3>Global settings</h3>
-          <div class="settings-grid">
+
+        <!-- Settings row: Global + iHost Connection -->
+        <div class="settings-grid" style="margin-bottom:20px;">
+
+          <div class="field-group">
+            <h3>Global settings</h3>
             <div class="field">
               <label>Speaker IP</label>
               <input id="ev-speaker" type="text" placeholder="192.168.1.x">
             </div>
             <div class="field">
-              <label>CubeScript URL</label>
+              <label>Cube IP</label>
+              <input id="ev-cube-ip" type="text" placeholder="192.168.x.x">
+            </div>
+            <div class="field">
+              <label>Cube token
+                <span class="set-indicator" id="cube-token-indicator"></span>
+              </label>
+              <input id="ev-cube-token" type="password"
+                     placeholder="(leave blank to keep current)">
+            </div>
+            <div class="field">
+              <label>CubeScript URL
+                <span style="font-size:10px;color:var(--muted)">(legacy relay)</span>
+              </label>
               <input id="ev-cube-url" type="text">
             </div>
-            <div class="field">
-              <label>Cube IP</label>
-              <input id="ev-cube-ip" type="text">
-            </div>
-            <div class="field">
-              <label>Cube token</label>
-              <input id="ev-cube-token" type="password" placeholder="(leave blank to keep current)">
-            </div>
           </div>
-        </div>
+
+          <div class="field-group">
+            <h3>🔌 iHost Connection</h3>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span id="cube-status-dot"></span>
+              <span id="cube-status-text"
+                    style="font-size:12px;color:var(--muted);">Not configured</span>
+            </div>
+            <p class="field-hint" style="line-height:1.65;margin-bottom:14px;">
+              1. Enter Cube IP in Global Settings, then click <b>Connect</b>.<br>
+              2. A pop-up appears on the iHost web console — click <b>Done</b>.<br>
+              3. Click <b>Confirm Token</b> — credentials save automatically.<br>
+              4. Click <b>Refresh Devices</b> to populate device dropdowns.
+            </p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-ghost" onclick="cubeConnect()">🔗 Connect</button>
+              <button class="btn btn-ghost" id="cube-confirm-btn"
+                      disabled onclick="cubeConfirmToken()">✓ Confirm Token</button>
+            </div>
+            <button class="btn btn-ghost"
+                    style="margin-top:8px;width:100%;justify-content:center;"
+                    onclick="cubeRefreshDevices()">↻ Refresh Devices</button>
+            <p id="cube-device-count"
+               style="font-size:11px;color:var(--muted);margin-top:6px;"></p>
+          </div>
+
+        </div><!-- /.settings-grid -->
+
         <div class="event-list" id="event-list"></div>
       </div>
 
@@ -429,6 +501,121 @@
   </div>
 </div>
 
+<!-- ─── Event edit modal ───────────────────────────────────────────── -->
+<div id="event-modal" onclick="closeEventModal(event)">
+  <div class="modal-box-lg" onclick="event.stopPropagation()">
+    <h3 id="event-modal-title">Edit Event</h3>
+
+    <div class="settings-grid">
+
+      <!-- Row 1: ID + Type -->
+      <div class="field">
+        <label>Event ID</label>
+        <input id="em-id" type="text" placeholder="unique_event_id">
+      </div>
+      <div class="field">
+        <label>Type</label>
+        <select id="em-type" onchange="onEventTypeChange()">
+          <option value="tts">TTS (voice)</option>
+          <option value="light">Light</option>
+        </select>
+      </div>
+
+      <!-- Row 2: Trigger + From camera -->
+      <div class="field">
+        <label>Trigger</label>
+        <input id="em-trigger" type="text"
+               placeholder="bernie-m, rosemary-f, anyone, nudity…">
+      </div>
+      <div class="field">
+        <label>From camera</label>
+        <input id="em-fromwhere" type="text"
+               placeholder="pool, garage, livecam…">
+      </div>
+
+      <!-- TTS: message -->
+      <div class="field em-tts-field" style="grid-column:1/-1">
+        <label>TTS message</label>
+        <input id="em-action-tts" type="text" placeholder="Spoken text…">
+      </div>
+
+      <!-- TTS: voice + speed -->
+      <div class="field em-tts-field">
+        <label>Voice</label>
+        <select id="em-voice">
+          <option value="af_nicole">af_nicole</option>
+          <option value="af_heart">af_heart</option>
+          <option value="ef_dora">ef_dora</option>
+          <option value="bf_emma">bf_emma</option>
+          <option value="am_onyx">am_onyx</option>
+        </select>
+      </div>
+      <div class="field em-tts-field">
+        <label>Speed</label>
+        <input id="em-speed" type="number" step="0.05" min="0.5" max="2.0"
+               value="0.95">
+      </div>
+
+      <!-- Light: device selector (full width) -->
+      <div class="field em-light-field" style="grid-column:1/-1">
+        <label>Device</label>
+        <select id="em-device-select" onchange="onDeviceSelect()">
+          <option value="">— select device (requires Refresh Devices) —</option>
+        </select>
+        <input id="em-device-manual" type="text"
+               placeholder="or enter device UUID (serial_number) manually"
+               style="margin-top:6px;">
+        <div class="field-hint">
+          Dropdown populates after ↻ Refresh Devices in the iHost Connection panel.
+          Manual UUID always works as a fallback.
+        </div>
+      </div>
+
+      <!-- Light: timeout + night only -->
+      <div class="field em-light-field">
+        <label>Auto-off timeout (sec)</label>
+        <input id="em-timeout" type="number" min="10" value="300">
+      </div>
+      <div class="field em-light-field">
+        <label>Night only</label>
+        <select id="em-night-only">
+          <option value="false">No — trigger any time</option>
+          <option value="true">Yes — after dark only</option>
+        </select>
+      </div>
+
+      <!-- Schedule: start + end (each has sunrise/sunset picker) -->
+      <div class="field">
+        <label>Schedule start</label>
+        <div id="em-start-picker"></div>
+      </div>
+      <div class="field">
+        <label>Schedule end</label>
+        <div id="em-end-picker"></div>
+      </div>
+
+      <!-- Cooldown + Enabled -->
+      <div class="field">
+        <label>Cooldown (sec)</label>
+        <input id="em-cooldown" type="number" min="0" value="60">
+      </div>
+      <div class="field">
+        <label>Enabled</label>
+        <select id="em-enabled">
+          <option value="false">Disabled</option>
+          <option value="true">Enabled</option>
+        </select>
+      </div>
+
+    </div><!-- /.settings-grid -->
+
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn btn-primary" onclick="saveEventModal()">Save event</button>
+      <button class="btn btn-ghost"   onclick="closeEventModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Toast ──────────────────────────────────────────────────────── -->
 <div id="toast"></div>
 
@@ -457,19 +644,14 @@ function toast(msg, ok = true) {
 
 /**
  * POST / PUT helper.
- *
- * FIX: Previously the dashboard had no CSRF protection.  We now send
- * X-Requested-With on every mutating fetch so the server can (optionally)
- * verify it wasn't triggered by a cross-origin form or script.
- * Flask-Login's session cookie is SameSite=Lax by default in recent
- * Werkzeug/Flask releases which also mitigates most CSRF vectors.
+ * Sends X-Requested-With on every mutating fetch (CSRF mitigation).
  */
 async function api(url, body) {
   const r = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',  // CSRF mitigation header
+      'X-Requested-With': 'XMLHttpRequest',
     },
     body: JSON.stringify(body),
   });
@@ -477,7 +659,6 @@ async function api(url, body) {
 }
 
 function esc(s) {
-  // XSS-safe text: converts HTML special chars to entities.
   return String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -514,7 +695,6 @@ function showPanel(name) {
   });
   document.getElementById('panel-title').textContent = PANEL_TITLES[name];
 
-  // Lazy-load panel data
   if (name === 'overview') loadStats();
   if (name === 'events')   loadEvents();
   if (name === 'security') loadCredentials();
@@ -526,10 +706,6 @@ function showPanel(name) {
    ───────────────────────────────────────────────────────────────────── */
 async function loadStats() {
   try {
-    // FIX: /api/stats now returns data computed by SQL aggregation in
-    // database.get_stats(), not a Python Counter over all rows.
-    // The JSON shape is identical so no template changes were needed —
-    // but the endpoint is now fast even on million-row databases.
     const d = await fetch('/api/stats').then(r => r.json());
     if (d.status !== 'success') throw new Error(d.message);
 
@@ -537,7 +713,6 @@ async function loadStats() {
     document.getElementById('stat-explicit').textContent = d.explicit.toLocaleString();
     document.getElementById('stat-faces').textContent    = d.faces.toLocaleString();
 
-    // Person breakdown pills
     const pc = document.getElementById('person-chart');
     pc.innerHTML = '';
     const persons = Object.entries(d.by_person || {}).sort((a,b) => b[1]-a[1]);
@@ -554,7 +729,6 @@ async function loadStats() {
       });
     }
 
-    // Category breakdown
     const cc = document.getElementById('category-chart');
     cc.innerHTML = '';
     const cats = Object.entries(d.by_category || {}).sort((a,b) => b[1]-a[1]);
@@ -578,7 +752,7 @@ async function loadStats() {
 /* ─────────────────────────────────────────────────────────────────────
    Gallery
    ───────────────────────────────────────────────────────────────────── */
-let allLogs = INITIAL_LOGS;   // seeded by Jinja2, refreshed on demand
+let allLogs = INITIAL_LOGS;
 let selectedIds = new Set();
 
 function buildGallery(logs) {
@@ -594,13 +768,10 @@ function buildGallery(logs) {
     const isExplicit = log.is_explicit || (log.explicit_parts && log.explicit_parts.toLowerCase() !== 'none');
     const hasFace = !!log.faces_path;
 
-    // Build the card using DOM methods (not innerHTML with raw log data)
-    // to guarantee XSS safety for all user-controlled fields.
     const card = document.createElement('div');
     card.className = 'gallery-card';
     card.dataset.id = log.id;
 
-    // Thumbnail
     if (thumb) {
       const img = document.createElement('img');
       img.className = 'gallery-thumb';
@@ -617,7 +788,6 @@ function buildGallery(logs) {
       card.appendChild(ph);
     }
 
-    // Meta
     const meta = document.createElement('div');
     meta.className = 'gallery-meta';
 
@@ -648,7 +818,6 @@ function buildGallery(logs) {
     meta.appendChild(tags);
     card.appendChild(meta);
 
-    // Actions
     const actions = document.createElement('div');
     actions.className = 'gallery-actions';
 
@@ -666,7 +835,6 @@ function buildGallery(logs) {
       actions.appendChild(blBtn);
     }
     card.appendChild(actions);
-
     grid.appendChild(card);
   });
 
@@ -748,8 +916,6 @@ function closeBaseline(e) {
 async function submitBaseline() {
   const name = document.getElementById('baseline-name').value.trim();
   if (!name) { toast('Enter a person name.', false); return; }
-  // FIX: server now validates the path is inside an allowed media directory
-  // (is_allowed_media_path check added to /add_to_baseline in web_server.py).
   const d = await api('/add_to_baseline', { path: _baselinePath, new_name: name });
   if (d.status === 'success') {
     toast('Added to baseline. Face cache will be rebuilt on next scan.');
@@ -760,28 +926,53 @@ async function submitBaseline() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   Events
+   Events — data + render
    ───────────────────────────────────────────────────────────────────── */
 let _eventsData = { settings: {}, events: [] };
+let _cubeDevices = [];   // populated by cubeRefreshDevices()
+let _editingIdx  = -1;   // -1 = new event, ≥0 = editing existing
 
 async function loadEvents() {
   try {
-    // FIX: /api/events previously used a relative path (events.json) in
-    // web_server.py which broke when the app wasn't started from its own
-    // directory.  Now uses an absolute path — this fetch just works.
     const d = await fetch('/api/events').then(r => r.json());
     _eventsData = d;
     renderEvents(d);
+    // Auto-refresh devices if Cube is already configured
+    const s = d.settings || {};
+    if (s.cube_ip && s.cube_token) {
+      setCubeStatus('connecting', `Configured · ${s.cube_ip}`);
+      cubeRefreshDevices();
+    }
   } catch (e) {
     toast('Could not load events.', false);
   }
 }
 
+/** Format a schedule time value for display in the event card. */
+function fmtScheduleTime(t) {
+  if (!t) return '??:??';
+  const m = /^(sunrise|sunset)([+-]\d+)?$/i.exec(t.trim());
+  if (!m) return t;
+  const icon   = m[1].toLowerCase() === 'sunrise' ? '🌅' : '🌇';
+  const offset = parseInt(m[2] || '0');
+  const offTxt = offset === 0 ? '' : (offset > 0 ? ` +${offset}m` : ` ${offset}m`);
+  return `${icon} ${m[1]}${offTxt}`;
+}
+
 function renderEvents(d) {
   const s = d.settings || {};
-  document.getElementById('ev-speaker').value   = s.speaker_ip      || '';
-  document.getElementById('ev-cube-url').value  = s.cubescript_url  || '';
-  document.getElementById('ev-cube-ip').value   = s.cube_ip         || '';
+  document.getElementById('ev-speaker').value  = s.speaker_ip     || '';
+  document.getElementById('ev-cube-url').value = s.cubescript_url || '';
+  document.getElementById('ev-cube-ip').value  = s.cube_ip        || '';
+
+  // Show ✓ indicator if token is stored
+  const tokenInd = document.getElementById('cube-token-indicator');
+  tokenInd.textContent = s.cube_token ? '✓ set' : '';
+
+  // Update connection status if already configured
+  if (s.cube_ip && s.cube_token) {
+    setCubeStatus('ok', `Connected · ${s.cube_ip}`);
+  }
 
   const list = document.getElementById('event-list');
   list.innerHTML = '';
@@ -790,28 +981,49 @@ function renderEvents(d) {
     const card = document.createElement('div');
     card.className = 'event-card' + (ev.enabled ? '' : ' disabled');
 
-    const badge = ev.type === 'tts' ? 'badge-tts' : 'badge-light';
+    const badge    = ev.type === 'tts' ? 'badge-tts' : 'badge-light';
     const badgeTxt = ev.type === 'tts' ? 'TTS' : 'Light';
+
+    // For light events, prefer device_name over the raw UUID
+    const actionDisplay = ev.type === 'light'
+      ? (ev.device_name || ev.action)
+      : ev.action;
+    const actionLabel = ev.type === 'light' ? 'Device' : 'Action';
+
+    const schedStart = fmtScheduleTime(ev.schedule?.start || '00:00');
+    const schedEnd   = fmtScheduleTime(ev.schedule?.end   || '23:59');
+
+    const nightBadge = (ev.type === 'light' && ev.night_only)
+      ? '&nbsp;·&nbsp;<span style="font-size:11px;color:var(--muted)">🌙 night only</span>'
+      : '';
 
     card.innerHTML = `
       <div class="event-body">
         <div class="event-header">
           <span class="event-id">${esc(ev.id)}</span>
           <span class="event-badge ${badge}">${badgeTxt}</span>
-          <span style="font-size:12px;color:var(--muted)">trigger: <b>${esc(ev.trigger)}</b></span>
-          ${ev.fromwhere ? `<span style="font-size:11px;color:var(--muted)">from: ${esc(ev.fromwhere)}</span>` : ''}
+          <span style="font-size:12px;color:var(--muted)">
+            trigger: <b>${esc(ev.trigger)}</b>
+          </span>
+          ${ev.fromwhere
+            ? `<span style="font-size:11px;color:var(--muted)">from: ${esc(ev.fromwhere)}</span>`
+            : ''}
         </div>
         <div class="event-detail">
-          Action: <b>${esc(ev.action)}</b> &nbsp;·&nbsp;
-          Cooldown: ${ev.cooldown}s &nbsp;·&nbsp;
-          Schedule: ${esc(ev.schedule?.start || '00:00')} – ${esc(ev.schedule?.end || '23:59')}
+          ${actionLabel}: <b>${esc(actionDisplay)}</b>
+          &nbsp;·&nbsp; Cooldown: ${ev.cooldown}s
+          &nbsp;·&nbsp; Schedule: ${schedStart} – ${schedEnd}
+          ${nightBadge}
         </div>
       </div>
       <div class="event-toggle">
         <input type="checkbox" class="toggle" data-idx="${i}"
-          ${ev.enabled ? 'checked' : ''} onchange="toggleEvent(${i}, this.checked)">
-        <button class="btn-xs btn-delete" style="width:auto;padding:5px 10px"
-          onclick="removeEvent(${i})">✕</button>
+               ${ev.enabled ? 'checked' : ''}
+               onchange="toggleEvent(${i}, this.checked)">
+        <button class="btn-xs btn-baseline" style="width:auto;padding:5px 10px;"
+                onclick="editEvent(${i})">✏️</button>
+        <button class="btn-xs btn-delete"   style="width:auto;padding:5px 10px;"
+                onclick="removeEvent(${i})">✕</button>
       </div>`;
 
     list.appendChild(card);
@@ -830,33 +1042,236 @@ function removeEvent(idx) {
   renderEvents(_eventsData);
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Events — edit modal
+   ───────────────────────────────────────────────────────────────────── */
+
 function addEvent() {
-  _eventsData.events.push({
-    id: 'new_event_' + Date.now(),
-    type: 'tts',
-    trigger: 'anyone',
-    action: 'Detection alert.',
-    enabled: false,
+  _editingIdx = -1;
+  openEventModal({
+    id:       'new_event_' + Date.now(),
+    type:     'tts',
+    trigger:  'anyone',
+    action:   'Detection alert.',
+    enabled:  false,
     cooldown: 60,
     schedule: { start: '00:00', end: '23:59' },
   });
-  renderEvents(_eventsData);
-  toast('New event added — edit events.json directly for full configuration.');
 }
 
+function editEvent(idx) {
+  _editingIdx = idx;
+  openEventModal(_eventsData.events[idx]);
+}
+
+function openEventModal(ev) {
+  document.getElementById('event-modal-title').textContent =
+    _editingIdx === -1 ? 'Add Event' : 'Edit Event';
+
+  // Common fields
+  document.getElementById('em-id').value       = ev.id        || '';
+  document.getElementById('em-type').value     = ev.type      || 'tts';
+  document.getElementById('em-trigger').value  = ev.trigger   || '';
+  document.getElementById('em-fromwhere').value = ev.fromwhere || '';
+  document.getElementById('em-cooldown').value = ev.cooldown  ?? 60;
+  document.getElementById('em-enabled').value  = String(ev.enabled !== false);
+
+  // TTS fields
+  document.getElementById('em-action-tts').value =
+    ev.type === 'tts' ? (ev.action || '') : '';
+  document.getElementById('em-voice').value = ev.voice || 'af_nicole';
+  document.getElementById('em-speed').value = ev.speed ?? 0.95;
+
+  // Light fields — populate device dropdown from cached device list
+  const sel = document.getElementById('em-device-select');
+  sel.innerHTML = '<option value="">— select device —</option>';
+  _cubeDevices.forEach(d => {
+    const opt     = document.createElement('option');
+    opt.value     = d.id;
+    const onlineDot = d.online ? '●' : '○';
+    opt.textContent = `${d.name}  [${d.category}] ${onlineDot}`;
+    // Pre-select if action UUID matches or device_name matches
+    if (ev.action === d.id || ev.device_name === d.name) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  // If the UUID wasn't matched in the dropdown, show it in the manual field
+  const manualInput = document.getElementById('em-device-manual');
+  const matchedInList = _cubeDevices.some(d => d.id === ev.action);
+  manualInput.value = (ev.type === 'light' && !matchedInList) ? (ev.action || '') : '';
+
+  document.getElementById('em-timeout').value    = ev.timeout    ?? 300;
+  document.getElementById('em-night-only').value = String(ev.night_only === true);
+
+  // Schedule pickers
+  buildSchedulePicker('em-start-picker', ev.schedule?.start || '00:00');
+  buildSchedulePicker('em-end-picker',   ev.schedule?.end   || '23:59');
+
+  onEventTypeChange();
+  document.getElementById('event-modal').classList.add('open');
+  setTimeout(() => document.getElementById('em-id').focus(), 60);
+}
+
+function closeEventModal(e) {
+  if (!e || e.target === document.getElementById('event-modal'))
+    document.getElementById('event-modal').classList.remove('open');
+}
+
+function onEventTypeChange() {
+  const type = document.getElementById('em-type').value;
+  document.querySelectorAll('.em-tts-field').forEach(el => {
+    el.style.display = type === 'tts' ? '' : 'none';
+  });
+  document.querySelectorAll('.em-light-field').forEach(el => {
+    el.style.display = type === 'light' ? '' : 'none';
+  });
+}
+
+function onDeviceSelect() {
+  // If a dropdown device is selected, clear the manual UUID field
+  if (document.getElementById('em-device-select').value)
+    document.getElementById('em-device-manual').value = '';
+}
+
+function saveEventModal() {
+  const type = document.getElementById('em-type').value;
+
+  let action, deviceName;
+  if (type === 'light') {
+    const selVal    = document.getElementById('em-device-select').value.trim();
+    const manualVal = document.getElementById('em-device-manual').value.trim();
+    action = selVal || manualVal;
+    if (!action) { toast('Select a device or enter a UUID.', false); return; }
+    const found = _cubeDevices.find(d => d.id === selVal);
+    deviceName = found ? found.name : '';
+  } else {
+    action = document.getElementById('em-action-tts').value.trim();
+    if (!action) { toast('Enter a TTS message.', false); return; }
+  }
+
+  const ev = {
+    id:        document.getElementById('em-id').value.trim() || ('ev_' + Date.now()),
+    type,
+    trigger:   document.getElementById('em-trigger').value.trim(),
+    fromwhere: document.getElementById('em-fromwhere').value.trim(),
+    action,
+    enabled:   document.getElementById('em-enabled').value === 'true',
+    cooldown:  parseInt(document.getElementById('em-cooldown').value) || 60,
+    schedule: {
+      start: getScheduleValue('em-start-picker'),
+      end:   getScheduleValue('em-end-picker'),
+    },
+  };
+
+  if (type === 'tts') {
+    ev.voice = document.getElementById('em-voice').value;
+    ev.speed = parseFloat(document.getElementById('em-speed').value) || 0.95;
+  } else {
+    if (deviceName) ev.device_name = deviceName;
+    ev.timeout    = parseInt(document.getElementById('em-timeout').value) || 300;
+    ev.night_only = document.getElementById('em-night-only').value === 'true';
+  }
+
+  if (_editingIdx === -1) {
+    _eventsData.events.push(ev);
+    toast('Event added — remember to Save events.');
+  } else {
+    _eventsData.events[_editingIdx] = ev;
+    toast('Event updated — remember to Save events.');
+  }
+
+  renderEvents(_eventsData);
+  document.getElementById('event-modal').classList.remove('open');
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Schedule time picker  (HH:MM  |  🌅 Sunrise ± N min  |  🌇 Sunset ± N min)
+   ───────────────────────────────────────────────────────────────────── */
+
+function buildSchedulePicker(containerId, value) {
+  const container = document.getElementById(containerId);
+
+  // Parse the incoming value
+  let selVal = 'time', timeVal = '00:00', offsetVal = 0;
+  if (value) {
+    const m = /^(sunrise|sunset)([+-]\d+)?$/i.exec(value.trim());
+    if (m) {
+      selVal    = m[1].toLowerCase();
+      offsetVal = m[2] ? parseInt(m[2]) : 0;
+    } else {
+      timeVal = value;
+    }
+  }
+
+  const showTime = selVal === 'time';
+  container.innerHTML = `
+    <div class="sched-row">
+      <select class="sched-type" onchange="onScheduleTypeChange(this)">
+        <option value="time"    ${selVal === 'time'    ? 'selected' : ''}>HH:MM</option>
+        <option value="sunrise" ${selVal === 'sunrise' ? 'selected' : ''}>🌅 Sunrise</option>
+        <option value="sunset"  ${selVal === 'sunset'  ? 'selected' : ''}>🌇 Sunset</option>
+      </select>
+      <input type="time" class="sched-time"
+             value="${timeVal}"
+             style="${showTime ? '' : 'display:none'}">
+      <div class="sched-sun"
+           style="display:${showTime ? 'none' : 'flex'};gap:4px;align-items:center;">
+        <input type="number" class="sched-offset"
+               value="${offsetVal}" min="-360" max="360"
+               placeholder="±min">
+        <span style="font-size:11px;color:var(--muted);">min</span>
+      </div>
+    </div>`;
+}
+
+function onScheduleTypeChange(sel) {
+  const row      = sel.closest('.sched-row');
+  const timeInp  = row.querySelector('.sched-time');
+  const sunDiv   = row.querySelector('.sched-sun');
+  if (sel.value === 'time') {
+    timeInp.style.display = '';
+    sunDiv.style.display  = 'none';
+  } else {
+    timeInp.style.display = 'none';
+    sunDiv.style.display  = 'flex';
+  }
+}
+
+function getScheduleValue(containerId) {
+  const container = document.getElementById(containerId);
+  const sel = container.querySelector('.sched-type');
+  if (!sel) return '00:00';
+  if (sel.value === 'time') {
+    return container.querySelector('.sched-time').value || '00:00';
+  }
+  const offset  = parseInt(container.querySelector('.sched-offset').value) || 0;
+  if (offset === 0) return sel.value;
+  return `${sel.value}${offset > 0 ? '+' : ''}${offset}`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Events — save / test
+   ───────────────────────────────────────────────────────────────────── */
+
 async function saveEvents() {
-  // Collect settings from form
   const token = document.getElementById('ev-cube-token').value.trim();
   _eventsData.settings = {
     speaker_ip:     document.getElementById('ev-speaker').value.trim(),
     cubescript_url: document.getElementById('ev-cube-url').value.trim(),
     cube_ip:        document.getElementById('ev-cube-ip').value.trim(),
+    // Keep existing token if the field was left blank
     cube_token:     token || _eventsData.settings?.cube_token || '',
   };
 
   const d = await api('/api/events', _eventsData);
-  if (d.status === 'success') toast('Events saved.');
-  else toast(d.message || 'Save failed.', false);
+  if (d.status === 'success') {
+    toast('Events saved.');
+    // Update indicator
+    document.getElementById('cube-token-indicator').textContent =
+      _eventsData.settings.cube_token ? '✓ set' : '';
+  } else {
+    toast(d.message || 'Save failed.', false);
+  }
 }
 
 async function testVoice() {
@@ -870,6 +1285,85 @@ async function testVoice() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
+   iHost Cube connection
+   ───────────────────────────────────────────────────────────────────── */
+
+function setCubeStatus(state, msg) {
+  const dot  = document.getElementById('cube-status-dot');
+  const text = document.getElementById('cube-status-text');
+  text.textContent = msg;
+  dot.style.background =
+    state === 'ok'         ? 'var(--success)' :
+    state === 'waiting'    ? 'var(--warn)'    :
+    state === 'error'      ? 'var(--danger)'  :
+    state === 'connecting' ? 'var(--accent)'  :
+    'var(--muted)';
+}
+
+async function cubeConnect() {
+  const ip = document.getElementById('ev-cube-ip').value.trim();
+  if (!ip) { toast('Enter Cube IP in Global Settings first.', false); return; }
+
+  setCubeStatus('connecting', 'Contacting iHost…');
+  const d = await api('/api/cube/connect', { cube_ip: ip });
+
+  if (d.status === 'waiting') {
+    setCubeStatus('waiting', d.message);
+    document.getElementById('cube-confirm-btn').disabled = false;
+    toast('Go to iHost web console and click Done.');
+  } else {
+    setCubeStatus('error', d.message || 'Connection failed.');
+    toast(d.message || 'Could not reach iHost.', false);
+  }
+}
+
+async function cubeConfirmToken() {
+  const ip = document.getElementById('ev-cube-ip').value.trim();
+  if (!ip) { toast('Enter Cube IP first.', false); return; }
+
+  setCubeStatus('connecting', 'Fetching token…');
+  const d = await api('/api/cube/token', { cube_ip: ip });
+
+  if (d.status === 'success') {
+    setCubeStatus('ok', `Connected · token: ${d.token_preview}`);
+    document.getElementById('cube-confirm-btn').disabled = true;
+    document.getElementById('cube-token-indicator').textContent = '✓ set';
+    document.getElementById('ev-cube-token').placeholder = '(saved automatically)';
+    toast(d.message || 'Token saved.');
+    // Sync in-memory settings so saveEvents() doesn't clobber the new token
+    const fresh = await fetch('/api/events').then(r => r.json());
+    _eventsData = fresh;
+    // Auto-refresh device list now that we have a valid token
+    cubeRefreshDevices();
+  } else if (d.status === 'waiting') {
+    setCubeStatus('waiting', d.message);
+    toast(d.message, false);
+  } else {
+    setCubeStatus('error', d.message || 'Token fetch failed.');
+    toast(d.message || 'Token fetch failed.', false);
+  }
+}
+
+async function cubeRefreshDevices() {
+  const d = await fetch('/api/cube/devices').then(r => r.json());
+  if (d.status === 'success') {
+    _cubeDevices = d.devices;
+    const total  = d.devices.length;
+    const online = d.devices.filter(x => x.online).length;
+    document.getElementById('cube-device-count').textContent =
+      `${total} device${total !== 1 ? 's' : ''} · ${online} online`;
+    setCubeStatus('ok', `Connected · ${total} devices`);
+    toast(`${total} device${total !== 1 ? 's' : ''} loaded.`);
+  } else {
+    document.getElementById('cube-device-count').textContent =
+      d.message || 'Could not fetch devices.';
+    if (d.message !== 'Cube not configured — complete the iHost Connection setup first.') {
+      toast(d.message || 'Device fetch failed.', false);
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
    Security
    ───────────────────────────────────────────────────────────────────── */
 async function loadCredentials() {
@@ -878,10 +1372,9 @@ async function loadCredentials() {
     document.getElementById('sec-user').value    = d.dash_user || '';
     document.getElementById('sec-cam-ip').value  = d.cam_ip    || '';
     document.getElementById('sec-cam-user').value = d.cam_user || '';
-    // Show set-indicators for fields that have a stored secret
     ['sec-pass', 'sec-cam-pass', 'sec-sh-pass'].forEach(id => {
       const inp = document.getElementById(id);
-      const key = id === 'sec-pass' ? 'dash_pass_set'
+      const key = id === 'sec-pass'     ? 'dash_pass_set'
                 : id === 'sec-cam-pass' ? 'cam_pass_set'
                 : 'sighthound_pass_set';
       let hint = inp.parentElement.querySelector('.set-indicator');
@@ -906,13 +1399,11 @@ async function saveSecurity() {
     cam_pass:        document.getElementById('sec-cam-pass').value        || undefined,
     sighthound_pass: document.getElementById('sec-sh-pass').value         || undefined,
   };
-  // Strip undefined so the server ignores blank fields
   Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
 
   const d = await api('/api/credentials', payload);
   if (d.status === 'success') {
     toast('Saved. ' + (d.message || ''));
-    // Clear password fields after save so they don't linger
     ['sec-pass','sec-cam-pass','sec-sh-pass'].forEach(id => {
       document.getElementById(id).value = '';
     });
